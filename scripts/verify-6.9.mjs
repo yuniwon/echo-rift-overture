@@ -111,7 +111,7 @@ function assertReleaseMetadata() {
   check('edition badge updated', includes(files.html, 'OVERTURE 6.9 · INTENT'));
   check('VERSION updated', includes(files.version, 'Version 6.9.0') && includes(files.version, 'Codename: INTENT'));
   check('README updated', includes(files.readme, '6.9') && includes(files.readme, 'INTENT'));
-  check('CHANGELOG has 6.9.0 first section', match(files.changelog, /^# .+\n\n## 6\.9\.0 — OVERTURE \/ INTENT/m));
+  check('CHANGELOG has 6.9.0 first section', match(files.changelog, /^# .+\r?\n\r?\n## 6\.9\.0 — OVERTURE \/ INTENT/m));
   check('TECHNICAL_NOTES updated', includes(files.technical, '6.9') && includes(files.technical, '부분 리롤'));
   check('QA_REPORT updated', includes(files.qa, '6.9') && includes(files.qa, 'INTENT'));
 }
