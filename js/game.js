@@ -184,7 +184,22 @@
     touchControlsMode: 'auto',
     tutorialTimingMode: 'adaptive',
     flashIntensity: 0.72,
+    combatPalette: 'default',
+    projectileShapes: true,
   };
+
+  // Owner colours per accessibility palette. Shape language is constant across palettes;
+  // only the colour mapping changes so colour-vision users still read ownership by hue.
+  const PROJECTILE_PALETTES = {
+    default:      { main: '#69ecff', echo: '#b97aff', enemy: '#ff5d7e' },
+    deuteranopia: { main: '#4cc9ff', echo: '#ffd166', enemy: '#ff6bcb' },
+    tritanopia:   { main: '#35f3b5', echo: '#ff7a9e', enemy: '#ffe15a' },
+    mono:         { main: '#ffffff', echo: '#b8b8b8', enemy: '#6f6f6f' },
+  };
+  const COMBAT_PALETTE_KEYS = ['default', 'deuteranopia', 'tritanopia', 'mono'];
+  function activeProjectilePalette() {
+    return PROJECTILE_PALETTES[settings.combatPalette] || PROJECTILE_PALETTES.default;
+  }
 
   function loadJSON(key, fallback) {
     try {
@@ -271,6 +286,8 @@
     if (!['adaptive', 'detailed', 'compact', 'sector'].includes(settings.echoReportMode)) settings.echoReportMode = 'adaptive';
     if (!['auto', 'always', 'hidden'].includes(settings.touchControlsMode)) settings.touchControlsMode = 'auto';
     if (!['adaptive', 'relaxed', 'strict'].includes(settings.tutorialTimingMode)) settings.tutorialTimingMode = 'adaptive';
+    if (!COMBAT_PALETTE_KEYS.includes(settings.combatPalette)) settings.combatPalette = 'default';
+    settings.projectileShapes = settings.projectileShapes !== false;
     settings.rarityPatterns = settings.rarityPatterns !== false;
     settings.echoTrail = settings.echoTrail !== false;
     settings.offscreenWarnings = settings.offscreenWarnings !== false;
@@ -281,6 +298,7 @@
     document.body.classList.toggle('high-contrast', settings.highContrast);
     document.body.classList.toggle('compact-hud', settings.hudMode === 'compact');
     document.body.classList.toggle('no-rarity-patterns', !settings.rarityPatterns);
+    document.body.dataset.combatPalette = settings.combatPalette;
     document.body.dataset.hudMode = settings.hudMode;
     document.body.dataset.damageNumbers = settings.damageNumbers;
     document.body.dataset.quality = String(quality);
@@ -307,6 +325,8 @@
     if ($('#echoReportMode')) $('#echoReportMode').value = settings.echoReportMode;
     if ($('#touchControlsMode')) $('#touchControlsMode').value = settings.touchControlsMode;
     if ($('#tutorialTimingMode')) $('#tutorialTimingMode').value = settings.tutorialTimingMode;
+    if ($('#combatPalette')) $('#combatPalette').value = settings.combatPalette;
+    if ($('#projectileShapesToggle')) $('#projectileShapesToggle').checked = settings.projectileShapes;
     if ($('#rarityPatternsToggle')) $('#rarityPatternsToggle').checked = settings.rarityPatterns;
     if ($('#echoTrailToggle')) $('#echoTrailToggle').checked = settings.echoTrail;
     if ($('#offscreenWarningsToggle')) $('#offscreenWarningsToggle').checked = settings.offscreenWarnings;
@@ -6479,31 +6499,76 @@
     ctx.restore();
   }
 
+  // Append an owner-marker shape to the CURRENT path (no per-bullet save/restore or ctx.rotate,
+  // so shaped heads keep the same batched single-fill draw budget as plain dots).
+  // Local geometry points along +x and is rotated into world space via precomputed cos/sin.
+  function appendArrowHead(px, py, ca, sa, r) {
+    ctx.moveTo(px + (r * 1.6) * ca, py + (r * 1.6) * sa);
+    ctx.lineTo(px - r * ca + (r * 0.7) * sa, py - r * sa - (r * 0.7) * ca);
+    ctx.lineTo(px - (r * 0.45) * ca, py - (r * 0.45) * sa);
+    ctx.lineTo(px - r * ca - (r * 0.7) * sa, py - r * sa + (r * 0.7) * ca);
+    ctx.closePath();
+  }
+  function appendDiamondHead(px, py, ca, sa, r) {
+    ctx.moveTo(px + (r * 1.35) * ca, py + (r * 1.35) * sa);
+    ctx.lineTo(px + r * sa, py - r * ca);
+    ctx.lineTo(px - (r * 1.35) * ca, py - (r * 1.35) * sa);
+    ctx.lineTo(px - r * sa, py + r * ca);
+    ctx.closePath();
+  }
+
   function drawPlayerBullets() {
     clearRenderGroups(renderGroups.player);
+    const palette = activeProjectilePalette();
+    const usePalette = settings.combatPalette !== 'default';
+    const shapes = settings.projectileShapes;
     for (const b of arrays.playerBullets) {
       if (!visible(b.x, b.y, 30)) continue;
-      addRenderGroup(renderGroups.player, `${b.color}|${b.crit ? 1 : 0}|${b.fromEcho ? 1 : b.fromDrone ? 2 : 0}`, b);
+      const owner = b.fromEcho ? 'echo' : 'main';
+      const color = usePalette ? palette[owner] : b.color;
+      addRenderGroup(renderGroups.player, `${color}|${b.crit ? 1 : 0}|${b.fromEcho ? 1 : b.fromDrone ? 2 : 0}`, b);
     }
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     for (const group of renderGroups.player.values()) {
       if (!group.length) continue;
       const sample = group[0];
-      ctx.strokeStyle = sample.color;
+      const owner = sample.fromEcho ? 'echo' : 'main';
+      const color = usePalette ? palette[owner] : sample.color;
+      ctx.strokeStyle = color;
       ctx.globalAlpha = sample.fromEcho ? 0.56 : sample.fromDrone ? 0.7 : 0.76;
       ctx.lineWidth = Math.max(1.3, sample.radius * (sample.crit ? 1.05 : 0.75));
-      setGlow(sample.color, sample.crit ? 14 : 8);
+      setGlow(color, sample.crit ? 14 : 8);
       ctx.beginPath();
       for (const b of group) { ctx.moveTo(b.prevX, b.prevY); ctx.lineTo(b.x - b.vx * 0.012, b.y - b.vy * 0.012); }
       ctx.stroke();
       clearGlow();
-      ctx.fillStyle = sample.crit ? '#fff4b0' : '#ecfeff';
-      ctx.globalAlpha = 0.94;
-      ctx.beginPath();
-      for (const b of group) { ctx.moveTo(b.x + b.radius, b.y); ctx.arc(b.x, b.y, b.radius * (b.crit ? 0.88 : 0.6), 0, TAU); }
-      ctx.fill();
+      if (shapes) {
+        // Echo bullets read as diamonds, current-body/drone bullets as arrows — colour-independent ownership.
+        ctx.globalAlpha = 0.96;
+        ctx.fillStyle = sample.crit ? '#fff4b0' : (usePalette ? color : '#ecfeff');
+        ctx.beginPath();
+        if (sample.fromEcho) {
+          for (const b of group) {
+            const a = Math.atan2(b.vy, b.vx); const r = Math.max(2.4, b.radius * (b.crit ? 1.02 : 0.82));
+            appendDiamondHead(b.x, b.y, Math.cos(a), Math.sin(a), r);
+          }
+        } else {
+          for (const b of group) {
+            const a = Math.atan2(b.vy, b.vx); const r = Math.max(2.4, b.radius * (b.crit ? 1.02 : 0.82));
+            appendArrowHead(b.x, b.y, Math.cos(a), Math.sin(a), r);
+          }
+        }
+        ctx.fill();
+      } else {
+        ctx.fillStyle = sample.crit ? '#fff4b0' : '#ecfeff';
+        ctx.globalAlpha = 0.94;
+        ctx.beginPath();
+        for (const b of group) { ctx.moveTo(b.x + b.radius, b.y); ctx.arc(b.x, b.y, b.radius * (b.crit ? 0.88 : 0.6), 0, TAU); }
+        ctx.fill();
+      }
     }
     clearGlow();
     ctx.restore();
@@ -6511,9 +6576,12 @@
 
   function drawEnemyBullets() {
     clearRenderGroups(renderGroups.enemy);
+    const palette = activeProjectilePalette();
+    const usePalette = settings.combatPalette !== 'default';
+    const shapes = settings.projectileShapes;
     for (const b of arrays.enemyBullets) {
       if (!visible(b.x, b.y, 30)) continue;
-      const color = settings.highContrast ? '#ff6b91' : b.color;
+      const color = usePalette ? palette.enemy : (settings.highContrast ? '#ff6b91' : b.color);
       addRenderGroup(renderGroups.enemy, color, b);
     }
     ctx.save();
@@ -6530,17 +6598,31 @@
       for (const b of group) { ctx.moveTo(b.prevX, b.prevY); ctx.lineTo(b.x, b.y); }
       ctx.stroke();
       clearGlow();
-      ctx.globalAlpha = 0.94;
-      ctx.fillStyle = settings.highContrast ? '#fff1f5' : color;
-      ctx.beginPath();
-      for (const b of group) { ctx.moveTo(b.x + b.radius, b.y); ctx.arc(b.x, b.y, b.radius, 0, TAU); }
-      ctx.fill();
-      if (quality > 0) {
-        ctx.globalAlpha = 0.82;
-        ctx.fillStyle = '#ffffff';
+      if (shapes) {
+        // Enemy bullets read as hollow rings (vs. solid player heads) — distinct even in greyscale.
+        ctx.globalAlpha = 0.95;
+        ctx.lineWidth = Math.max(1.4, sample.radius * 0.5);
         ctx.beginPath();
-        for (const b of group) { const r=Math.max(1,b.radius*0.27); ctx.moveTo(b.x+r,b.y); ctx.arc(b.x,b.y,r,0,TAU); }
+        for (const b of group) { ctx.moveTo(b.x + b.radius, b.y); ctx.arc(b.x, b.y, b.radius, 0, TAU); }
+        ctx.stroke();
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = (usePalette || settings.highContrast) ? color : '#fff1f5';
+        ctx.beginPath();
+        for (const b of group) { const r = Math.max(1, b.radius * 0.42); ctx.moveTo(b.x + r, b.y); ctx.arc(b.x, b.y, r, 0, TAU); }
         ctx.fill();
+      } else {
+        ctx.globalAlpha = 0.94;
+        ctx.fillStyle = settings.highContrast ? '#fff1f5' : color;
+        ctx.beginPath();
+        for (const b of group) { ctx.moveTo(b.x + b.radius, b.y); ctx.arc(b.x, b.y, b.radius, 0, TAU); }
+        ctx.fill();
+        if (quality > 0) {
+          ctx.globalAlpha = 0.82;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          for (const b of group) { const r=Math.max(1,b.radius*0.27); ctx.moveTo(b.x+r,b.y); ctx.arc(b.x,b.y,r,0,TAU); }
+          ctx.fill();
+        }
       }
     }
     clearGlow();
@@ -7638,6 +7720,16 @@
     saveJSON(SETTINGS_KEY, settings);
     applySettings();
     refreshTutorialCopy(true);
+  });
+  $('#combatPalette')?.addEventListener('change', (event) => {
+    settings.combatPalette = COMBAT_PALETTE_KEYS.includes(event.target.value) ? event.target.value : 'default';
+    saveJSON(SETTINGS_KEY, settings);
+    applySettings();
+  });
+  $('#projectileShapesToggle')?.addEventListener('change', (event) => {
+    settings.projectileShapes = event.target.checked;
+    saveJSON(SETTINGS_KEY, settings);
+    applySettings();
   });
   $('#rarityPatternsToggle')?.addEventListener('change', (event) => {
     settings.rarityPatterns = event.target.checked;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#050817" />
   <meta name="description" content="현재의 나와 고정한 과거가 같은 적을 공격해 위상 균열을 여는 브라우저 액션 로그라이트." />
-  <title>ECHO RIFT: OVERTURE 6.6 — 보스가 시작되기 전, 시간선이 멈춘다</title>
+  <title>ECHO RIFT: OVERTURE 6.8 — 신호, 누구의 탄환인지 한눈에</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
@@ -143,7 +143,7 @@
         <div class="menu-signal-row"><span class="signal-dot"></span><span>ARCHIVE SIGNAL ONLINE</span><b>06</b></div>
         <div class="logo-lockup">
           <div class="logo-mark" aria-hidden="true"><span class="orbit o1"></span><span class="orbit o2"></span><span class="core"></span></div>
-          <div><p class="eyebrow">DESIGN THREE SECONDS. FIGHT THEM TWICE.</p><div class="edition-badge">OVERTURE 6.6 · BOSS INTRO SUSPENSION</div></div>
+          <div><p class="eyebrow">DESIGN THREE SECONDS. FIGHT THEM TWICE.</p><div class="edition-badge">OVERTURE 6.8 · SIGNAL</div></div>
         </div>
         <h1>ECHO <span>RIFT</span></h1>
         <p class="kicker">시간의 잔향</p>
@@ -228,6 +228,8 @@
             <label class="setting-row"><span><b>터치 컨트롤</b><small>터치 노트북에서는 최근 사용 입력에 따라 자동 전환</small></span><select id="touchControlsMode"><option value="auto">최근 입력에 맞춰 자동</option><option value="always">항상 표시</option><option value="hidden">항상 숨김</option></select></label>
             <label class="setting-row"><span><b>훈련 동기화 유예</b><small>두 위상 표적을 맞힐 수 있는 시간 창</small></span><select id="tutorialTimingMode"><option value="adaptive">장치별 자동 · 권장</option><option value="relaxed">여유롭게 · 2.0초</option><option value="strict">정밀하게 · 0.9초</option></select></label>
             <label class="setting-row"><span><b>피해 숫자</b><small>탄막이 많은 장면의 시각 밀도</small></span><select id="damageNumbersMode"><option value="full">모두 표시</option><option value="reduced">중요 수치 위주</option><option value="minimal">치명타·코어만</option></select></label>
+            <label class="setting-row"><span><b>전투 색상 팔레트</b><small>색약 보정·단색 모드. 색상과 형상을 함께 써 투사체 소유권을 구분</small></span><select id="combatPalette"><option value="default">기본</option><option value="deuteranopia">적록 보정</option><option value="tritanopia">청황 보정</option><option value="mono">고대비 단색</option></select></label>
+            <label class="setting-row"><span><b>투사체 형상 구분</b><small>현재(화살)·잔향(마름모)·적(고리)을 색상 없이도 구분</small></span><input id="projectileShapesToggle" type="checkbox" checked /></label>
             <label class="setting-row"><span><b>희귀도 문양</b><small>색상 외에도 패턴과 실루엣으로 구분</small></span><input id="rarityPatternsToggle" type="checkbox" checked /></label>
             <label class="setting-row"><span><b>잔향 기록 궤적</b><small>현재 버퍼에 들어 있는 최근 3초의 이동·사격 경로 표시</small></span><input id="echoTrailToggle" type="checkbox" checked /></label>
             <label class="setting-row"><span><b>화면 밖 위험 표시</b><small>엘리트·돌진·보스의 방향을 화면 가장자리에 표시</small></span><input id="offscreenWarningsToggle" type="checkbox" checked /></label>

@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 6.6.0
-Codename: BOSS INTRO SUSPENSION
+Version 6.8.0
+Codename: SIGNAL
 Build date: 2026-06-23
-Focus: freeze the entire combat simulation during boss introductions, exclude intro time from run timing, and spawn the boss only after the title sequence ends.
+Focus: read projectile ownership without relying on colour. Current-body bullets render as arrows, echo bullets as diamonds, and enemy bullets as hollow rings; a combat colour-vision palette (default / deuteranopia / tritanopia / mono) recolours ownership while keeping the shape language constant. Result panels gain an opaque backdrop for readability over busy combat, and the menu keeps its start CTA on the first screen in short landscape.
