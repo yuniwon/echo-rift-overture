@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echo-rift-control-v6.11.1';
+const CACHE_NAME = 'echo-rift-prism-v7.0.0';
 const CORE_ASSETS = [
   './',
   './index.html',

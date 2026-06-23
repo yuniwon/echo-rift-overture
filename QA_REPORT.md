@@ -1,10 +1,10 @@
-# ECHO RIFT: OVERTURE 6.11 — QA 보고서 (CONTROL)
+# ECHO RIFT: OVERTURE 7.0 — QA 보고서 (PRISM)
 
 검증일: 2026-06-24
 
 ## 환경 한계
 
-이번 패치는 정적 파일 기반 브라우저 게임의 입력 통제와 리롤 계측을 보강했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-6.9.mjs`의 구조 검사, `scripts/verify-6.10-hardening.mjs`의 기존 행동 검사, `scripts/verify-6.11-control.mjs`의 컨트롤/경제 행동 검사를 수행했습니다. 실제 모바일 터치 실기기, 물리 게임패드, 오디오 청감, 저사양 장시간 성능 검사는 별도 수동 확인이 필요합니다.
+이번 패치는 정적 파일 기반 브라우저 게임의 전투 렌더링 성능을 보강했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-7.0-render.mjs`의 렌더 계약/벤치 검사, `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`의 기존 회귀 검사를 수행합니다. 실제 모바일 터치 실기기, 물리 게임패드, 오디오 청감, 저사양 장시간 성능, 고주사율 모니터 체감 검사는 별도 수동 확인이 필요합니다.
 
 ## 실행한 자동 검사
 
@@ -13,11 +13,31 @@
 | `node --check js/game.js` | 브라우저 런타임 스크립트 구문 검사 |
 | `node --check js/control-bindings.js` | 키보드 바인딩 헬퍼 구문 검사 |
 | `node --check sw.js` | 서비스워커 구문 검사 |
+| `node scripts/verify-7.0-render.mjs` | PRISM 글로우/프레임타임 품질/렌더 벤치 검사 |
 | `node scripts/verify-6.9.mjs` | 6.9 기능 연결, HTML ID 중복, manifest 파싱, 현재 릴리스 문자열 검사 |
 | `node scripts/verify-6.10-hardening.mjs` | 부분 리롤, import/undo, import 거부, 보스 인트로, 경로 예고 일치의 실제 브라우저 행동 검사 |
 | `node scripts/verify-6.11-control.mjs` | 설정 리매핑, 강화 카드 구조, 리롤 경제 계측, 90초 전투 루프 행동 검사 |
 | Playwright 브라우저 스모크 | 1366×768 로드, 설정 화면 진입, 데이터 UI ID, QA 훅, 콘솔/페이지 오류 확인 |
 | Git for Windows `sha256sum.exe -c CHECKSUMS.sha256` | 배포 파일 체크섬 검증 |
+
+## `verify-7.0-render` 검사 범위
+
+- 런타임 소스에 `ctx.shadowBlur` 직접 사용이 없는지 확인
+- player/enemy bullet과 particle hot path가 사전 렌더 글로우 스프라이트를 사용하는지 확인
+- 6.8 SIGNAL의 화살·마름모·고리 형상과 팔레트 분기 유지 확인
+- 자동 품질 강등이 frame-time 기반이고 sticky 계약을 유지하는지 확인
+- QA `renderBenchmark`가 160 적탄 / 70 입자 / 90프레임 장면의 frame time, glow pass, shadow blur use를 반환하는지 확인
+
+## PRISM 렌더 벤치 결과
+
+1366×768 headless Chromium에서 160 적탄 / 70 입자 / 30 warmup 제외 / 90 measured render frames 기준으로 측정했습니다. 6.11.1 baseline은 임시 in-memory QA 주입으로 측정했고, 7.0.0 after는 커밋된 `renderBenchmark()`로 측정했습니다.
+
+| 항목 | 6.11.1 baseline | 7.0.0 after |
+|---|---:|---:|
+| 평균 렌더 프레임 | 64.644 ms | 17.292 ms |
+| 최대 렌더 프레임 | 3091.700 ms | 256.900 ms |
+| positive shadow blur writes | 720 | 0 |
+| glow sprite passes | N/A | 17,550 |
 
 ## `verify-6.11-control` 검사 범위
 
@@ -50,12 +70,12 @@
 - export/import 함수 내부의 `fetch`/`sendBeacon`/`eval`/`new Function` 미사용
 - 데이터 설정 UI ID 연결
 - 런 기록 상수, 로드/검증/추가/렌더링 헬퍼, 20개 상한, 중복 기록 방지 플래그
-- HTML ID 중복 없음, manifest JSON 파싱, 현재 CONTROL 릴리스 문자열
+- HTML ID 중복 없음, manifest JSON 파싱, 현재 PRISM 릴리스 문자열
 
 ## 브라우저 스모크 확인 범위
 
 - `index.html?qa=1` 로드 성공
-- 문서 제목과 edition badge가 CONTROL 릴리스로 표시
+- 문서 제목과 edition badge가 PRISM 릴리스로 표시
 - 설정 화면 진입 성공
 - `includeSettingsExport`, `exportSaveBtn`, `importSaveInput`, `runHistoryList`, `clearRunHistoryBtn`, `keybindGrid`, `resetKeyBindingsBtn` 존재
 - `window.__echoRiftQA` 활성화

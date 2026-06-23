@@ -1,5 +1,25 @@
 # 변경 내역
 
+## 7.0.0 — OVERTURE / PRISM
+
+### 렌더링 성능 회복
+
+- 전투 탄막/입자 hot path의 Canvas `shadowBlur` 글로우를 사전 렌더 글로우 스프라이트 기반 `drawImage` 경로로 교체
+- 플레이어 탄환, 잔향 탄환, 적탄, 입자의 네온 글로우는 유지하면서 6.8 SIGNAL의 화살·마름모·고리 형상과 팔레트 분기를 보존
+- `window.echoRiftStatus.renderPerf`와 QA 전용 `__echoRiftQA.renderBenchmark()` 추가
+
+### 자동 품질 강등 교정
+
+- 물체 수 기반 `pressureTrip` 강등을 제거하고 실측 frame time / long-frame score를 1차 근거로 사용
+- 자동 모드에서 강등 후 런 중 재상향하지 않는 sticky 계약 유지
+- 수동 그래픽 모드와 reduced-motion 경계 유지
+
+### 검증
+
+- `scripts/verify-7.0-render.mjs` 추가
+- 160 적탄 / 70 입자 / 90프레임 렌더 벤치 전후 수치 기록
+- 서비스워커 cache name을 `echo-rift-prism-v7.0.0`으로 갱신
+
 ## 6.11.1 — OVERTURE / CONTROL PATCH
 
 ### Chrome 마우스 선택 회귀 수정
