@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 6.8.0
-Codename: SIGNAL
+Version 6.9.0
+Codename: INTENT
 Build date: 2026-06-23
-Focus: read projectile ownership without relying on colour. Current-body bullets render as arrows, echo bullets as diamonds, and enemy bullets as hollow rings; a combat colour-vision palette (default / deuteranopia / tritanopia / mono) recolours ownership while keeping the shape language constant. Result panels gain an opaque backdrop for readability over busy combat, and the menu keeps its start CTA on the first screen in short landscape.
+Focus: player intent and data safety. Upgrade cards can be locked before rerolling so only unwanted choices are recalculated, save data can be exported/imported as an offline checksummed JSON envelope, and the client keeps a bounded recent-run history of 20 summaries.

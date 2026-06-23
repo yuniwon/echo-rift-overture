@@ -1,47 +1,45 @@
-# ECHO RIFT — BASELINE AUDIT (pre-6.8.0)
+# ECHO RIFT — BASELINE AUDIT (pre-6.9.0)
 
-Audited source: working tree at `js/game.js` (8,308 lines), `index.html`, `css/style.css`.
-Method: code inspection + `node --check`. Version file reports **6.6.0 — BOSS INTRO SUSPENSION**.
+Audited source: `main-8nq3th` handoff branch before INTENT implementation. Baseline release was **6.8.0 — SIGNAL**.
 
-## Verified present (do not rebuild)
+## Verified Present Before 6.9
 
 | Area | Status | Evidence |
 |---|---|---|
-| Echo snapshot lock + preview parity | Present | `input.getEchoLockedSamples()`, `drawRecordedEchoPath` (game.js ~6551) |
-| Crossfire "phase rift" reward | Present | `registerPhaseRiftHit` (~5535) |
-| Route final forecast | Present | route preview DOM (`#routePreviewName`) |
-| Tutorial split (basic/advanced) | Present | `advancedTutorialSeen` save field |
-| Boss intro simulation freeze (6.6) | Present | VERSION.txt + boss intro banner CSS |
-| Accessibility: high contrast, reduced motion, UI scale, flash intensity, rarity patterns | Present | `defaultSettings` (163), `applySettings` (259) |
-| Auto-quality sticky tier (no runtime up-shift) | Present | `autoQualityTier`, `configuredQualityTier` (331) |
-| Legacy localStorage compatibility | Present | `loadSaveData` reads `LEGACY_SAVE_KEY` |
-| Offline PWA | Present | `sw.js`, `manifest.webmanifest` |
+| Upgrade draft generation | Present | `createUpgradeChoices(count = 4, isReroll = false)` |
+| Full reroll | Present | `rerollUpgradeChoices()` consumed one reroll and regenerated all choices |
+| Save key compatibility | Present | `SAVE_KEY = 'echoRiftSaveV2'`, `SETTINGS_KEY = 'echoRiftSettingsV1'` |
+| Settings validation pattern | Present | `defaultSettings` → `applySettings()` → event bindings |
+| Run ending hooks | Present | `endGame()` for death, `showVictory()` for win |
+| Run recap values | Present | `buildRunRecap()`, `strongestFamilies()`, echo/phase-rift counters |
+| QA status hook | Present | `window.echoRiftStatus` with current choices and combat/readability state |
+| 6.8 SIGNAL readability | Present | `combatPalette`, `projectileShapes`, shaped projectile rendering |
+| Offline PWA | Present | `sw.js`, `manifest.webmanifest`, no external dependencies |
 
-## NOT present (gaps vs. handoff "expected baseline")
+## Not Present Before 6.9
 
-| Feature | Status |
+| Feature | Baseline status |
 |---|---|
-| 6.7 input remapping (keyboard/gamepad rebinds, deadzone, sensitivity, axis invert, touch handedness) | **Absent** — no `keyBindings`/`gamepadDeadzone`/`touchHandedness` in source |
-| Combat colour-vision palettes | Absent (`combatPalette` = 0 hits) |
-| Projectile owner shapes | Absent — bullets distinguished by colour/alpha only (`drawPlayerBullets` 6482, `drawEnemyBullets` 6512) |
-| Mobile card density modes | Absent (`cardDensity` = 0 hits) |
-| Partial reroll / save export / run history / telemetry | Absent |
+| Card lock / partial reroll | Absent |
+| `createUpgradeChoices` external exclude ids | Absent |
+| Save export/import JSON envelope | Absent |
+| Import checksum and 1MB validation | Absent |
+| Import backup key | Absent |
+| Local run history key and list UI | Absent |
+| 6.9 release metadata | Absent |
 
 ## Decision
 
-The handoff's prioritized **remaining-work backlog (MASTER_SPEC §4) begins at Phase 1 "SIGNAL"**; the 6.7
-input-remapping work is listed only as an assumed baseline, not as a scoped backlog phase. Following the
-"first incomplete backlog item, one goal per release" rule, this release implements **Phase 1 SIGNAL (v6.8.0)**:
+The 6.9 handoff's single goal is **selection control and data safety**. The implemented scope is:
 
-1. Projectile owner shapes (colour-independent)
-2. Combat colour-vision palettes
-3. Result-panel contrast / readability
-4. Short-landscape menu start CTA
+1. P0 card lock and partial reroll.
+2. P0 offline save export/import with checksum validation and backup-before-apply.
+3. P1 bounded local run history, included because it is small and shares the export envelope.
 
-Mobile card density (P1) is deferred to a follow-up patch (6.8.1/6.9) per the handoff's split guidance.
-The 6.7 input-remapping gap is recorded here and surfaced to the user; it is **not** silently skipped.
+Telemetry, network services, new combat content, and Phase 3+ backlog remain excluded.
 
-## Baseline checks
+## Baseline Checks
 
-- `node --check js/game.js` → OK
-- `node --check sw.js` → OK
+- `node --check js/game.js` — OK before implementation
+- `node --check sw.js` — OK before implementation
+- `node scripts/verify-6.9.mjs` — failed before implementation, as expected, on missing 6.9 features and metadata

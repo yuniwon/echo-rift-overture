@@ -1,56 +1,86 @@
-# IMPLEMENTATION PLAN — v6.8.0 "SIGNAL"
+# IMPLEMENTATION PLAN — v6.9.0 "INTENT"
 
-## Single goal of this release
-Combat legibility: make projectile ownership and run results readable without relying on colour alone,
-and keep the start CTA reachable on short landscape screens.
+## Single Goal
 
-## Files modified
-- `js/game.js` — palette registry, two new settings, render shapes, settings bindings, version/cache string
-- `index.html` — two new settings rows, `<title>`/version badge
-- `css/style.css` — result-panel contrast, short-landscape menu rules
-- `sw.js` / `manifest.webmanifest` / `VERSION.txt` / `README.md` / `CHANGELOG.md` / `TECHNICAL_NOTES.md` / `QA_REPORT.md`
+선택 통제와 데이터 안전. 강화 선택지는 잠금/부분 리롤로 플레이어 의도를 보존하고, 브라우저 저장은 오프라인 JSON 내보내기·가져오기와 최근 런 기록으로 사용자가 직접 백업할 수 있게 한다.
 
-## Existing functions / data reused
-- `defaultSettings` (game.js:163), `applySettings` (259), settings change-binding block (~7589)
-- `drawPlayerBullets` (6482), `drawEnemyBullets` (6512) — batched trail + head renderer
-- Player bullet fields: `fromEcho`, `fromDrone`, `color`, `crit`, `radius`, `vx`, `vy`, `prevX/prevY`
-- `.result-screen` / `.result-panel` (CSS 400), `.menu-command` / `#startBtn` (CSS 121+)
+## Files Modified
 
-## New settings (with fallback + migration)
-- `combatPalette`: `'default' | 'deuteranopia' | 'tritanopia' | 'mono'` (validated in `applySettings`, defaults to `default`)
-- `projectileShapes`: boolean (defaults `true`, `!== false` guard)
-Both are additive keys on the existing `echoRiftSettingsV1` object — `loadJSON` already merges over
-`defaultSettings`, so old saves gain the new keys automatically. No save-schema bump needed.
+- `js/game.js` — 부분 리롤, 저장 export/import, 런 기록, QA 상태/훅, 버전 상수
+- `index.html` — 6.9 버전 문구, 설정 화면 데이터 그룹
+- `css/style.css` — 잠금 토글, 데이터 그룹, 런 기록 목록, 모바일 접힘 규칙
+- `sw.js` / `manifest.webmanifest` / `VERSION.txt` — 6.9 INTENT 릴리스 메타데이터
+- `README.md` / `CHANGELOG.md` / `TECHNICAL_NOTES.md` / `QA_REPORT.md` / `BASELINE_AUDIT.md` / `START_HERE.txt` — 릴리스 문서
+- `scripts/verify-6.9.mjs` — 6.9 회귀 검증 스크립트
+- `CHECKSUMS.sha256` — 배포 파일 체크섬
 
-## Rendering approach (performance-safe)
-- Owner class: `echo` (fromEcho) / `main` (player + drone) / `enemy`.
-- Display colour: in `default` palette keep each bullet's existing `b.color` (no visual regression); in other
-  palettes remap to the palette's owner colour so ownership reads consistently.
-- Shapes drawn by accumulating vertices into a **single path per owner group** (no per-bullet save/restore,
-  no per-bullet `rotate`) using precomputed cos/sin — preserves the existing batched draw-call budget:
-  - main → arrow head, echo → diamond head, enemy → ring outline + core.
-- When `projectileShapes` is off, fall back to current arc heads. Shapes are kept even at quality 0
-  (minimum shape requirement); only decorative dashed tails are dropped at low quality.
-- Gameplay `b.color` is untouched, so explosion/burn/mark tint logic is unaffected.
+## Actual Functions and Data Flow
 
-## Save migration
-None required (additive settings keys only). Existing progress/meta/highscore untouched.
+### Partial Reroll
 
-## Performance risk
-Shaped heads add a few `lineTo`s per bullet but stay one `fill`/`stroke` per group. Trails unchanged.
-Target: no meaningful long-frame regression at 100+ projectiles.
+- `createUpgradeChoices(count = 4, isReroll = false, options = {})`
+  - `options.excludeIds`가 있으면 후보 풀에서 해당 `upgrade.id` 제외
+  - 기존 rarity pity/guarantee 흐름 유지
+- `lockedUpgradeIds`
+  - 현재 강화 화면에서 잠긴 카드 id 저장
+  - `openUpgradeScreen()`과 `selectUpgrade()`에서 초기화
+- `renderUpgradeChoices()`
+  - 카드별 잠금 컨트롤 렌더링
+  - 모두 잠기면 `#rerollBtn` 비활성화
+- `rerollUpgradeChoices()`
+  - 잠긴 슬롯은 원래 위치 유지
+  - 잠기지 않은 슬롯만 `createUpgradeChoices(needed, true, { excludeIds })`
+  - 실제 교체가 있을 때만 `player.rerolls--`
 
-## Accessibility risk
-Goal is a net accessibility gain. Verify ownership distinguishable in `mono` palette (greyscale) by shape,
-and that shapes persist under high-contrast + reduced-motion.
+### Save Export / Import
 
-## Manual tests
-- Toggle each palette → ownership still readable; setting persists across reload.
-- Toggle projectile shapes off/on.
-- Result screens (victory/death) readable over busy combat; primary stats visible at 320×568.
-- Start CTA visible without scroll at 667×375, 740×360, 812×375.
-- `node --check js/game.js`, `node --check sw.js`; no duplicate HTML IDs.
+- `buildExportEnvelope(includeSettings)`
+  - `saveData`, 선택적 `settings`, `loadRunHistory()`를 payload로 구성
+  - `JSON.stringify(payload)`에 SHA-256 checksum 생성
+- `parseImportFile(file)`
+  - 파일 존재, 1MB 제한, JSON 파싱, product, schema, payload/save plain object, checksum 검증
+  - `sanitizeImportedSave`, `sanitizeImportedSettings`, `validateRunHistory`로 보정
+- `importSaveFile(file)`
+  - 검증 완료 후 현재 save/settings/history를 `IMPORT_BACKUP_KEY`에 저장
+  - 새 save/settings/history 적용 후 reload
+  - 실패 시 기존 저장 키를 다시 쓰지 않음
 
-## Explicit non-goals this release
-Mobile card density, partial reroll, save export, run history, telemetry, arena devices, second boss,
-6.7 input remapping. (Recorded for later phases.)
+### Local Run History
+
+- `RUN_HISTORY_KEY = 'echoRiftRunHistoryV1'`
+- 최대 20개 요약만 `{ version: 1, list }`로 저장
+- `appendRunHistory(outcome)`은 `runHistoryRecorded`로 한 런에서 한 번만 기록
+- `showVictory()`는 `win`, `endGame()`은 `death`
+- 기록 목록은 설정 화면 데이터 그룹에서 읽기/초기화
+
+## Migration and Compatibility
+
+- 기존 `echoRiftSaveV2`, `echoRiftSettingsV1` 유지
+- `loadSaveData()` 기본값을 `saveDataDefaults()`/`normalizeSaveData()`로 공용화
+- 새 런 기록은 별도 키로 추가
+- import 실패 시 기존 진행·설정·기록 보존
+
+## Performance and Accessibility Risks
+
+- 전투 루프에 DOM 작업 추가 없음
+- 강화 선택 화면과 설정 화면에서만 새 DOM 생성
+- 잠금 토글은 44px 이상 터치 목표와 `aria-pressed` 제공
+- 데이터 그룹 버튼은 작은 화면에서 세로 배치
+
+## Automatic Tests
+
+- `node --check js/game.js`
+- `node --check sw.js`
+- `node scripts/verify-6.9.mjs`
+- `sha256sum -c CHECKSUMS.sha256`
+
+## Manual Tests Still Needed
+
+- 실제 브라우저에서 부분 리롤 조작 체감
+- export/import 왕복과 reload 후 설정 반영
+- 모바일/가로/초소형 뷰포트 레이아웃
+- 장시간 플레이에서 런 기록 수치와 결과 화면 일치
+
+## Explicit Non-goals
+
+로컬 텔레메트리, 서버/계정/네트워크 저장, 신규 강화, 수치 리밸런스, 공간 장치, 두 번째 보스, Phase 3 이후 기능.

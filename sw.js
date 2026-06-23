@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echo-rift-signal-v6.8.0';
+const CACHE_NAME = 'echo-rift-intent-v6.9.0';
 const CORE_ASSETS = [
   './',
   './index.html',
