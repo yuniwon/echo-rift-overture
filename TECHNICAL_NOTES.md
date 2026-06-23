@@ -1,4 +1,62 @@
-# ECHO RIFT: OVERTURE 6.9 — 기술 노트 (INTENT)
+# ECHO RIFT: OVERTURE 6.10 — 기술 노트 (HARDENING)
+
+## 6.10 목표
+
+정적 문자열 검사를 넘어서 실제 브라우저 행동으로 핵심 계약을 검증합니다. 6.9 기능은 유지하고, 저장 가져오기와 서비스워커 실패 경로를 더 엄격하게 처리합니다. 신규 강화, 전투 수치 밸런스, 콘텐츠, 온라인 텔레메트리는 추가하지 않았습니다.
+
+## 행동 기반 검증
+
+`scripts/verify-6.10-hardening.mjs`는 로컬 정적 서버와 Playwright를 사용해 다음 행동을 실제 브라우저에서 수행합니다.
+
+- 카드 두 장 잠금 후 부분 리롤: 잠긴 슬롯의 id·희귀도 유지와 리롤 자원 1회 소비 확인
+- 모든 카드 잠금 후 리롤: 선택지와 리롤 자원 미변경 확인
+- 저장 가져오기: save/settings/runHistory 적용, unknown key 제거, meta 상한 클램프 확인
+- 마지막 가져오기 되돌리기: 설정 화면 버튼 활성화, 이전 저장 복원, 백업 제거 확인
+- 손상 checksum, 미래 schema, 1MB 초과 파일 거부 확인
+- 보스 인트로 중 피해·게임 시간·생명·보호막 정지 확인
+- 경로 예고 수치와 실제 `currentWave.modifier` 수치 일치 확인
+
+기존 `scripts/verify-6.9.mjs`는 6.9 기능 연결과 릴리스 메타데이터 구조 검사를 계속 담당합니다.
+
+## 저장 가져오기 하드닝
+
+`saveJSON()`은 기존 일반 저장 호출과의 호환을 위해 실패 시 `false`를 반환하는 완화 경로로 유지합니다. 반면 가져오기는 `strictSetJSON()`과 `strictSetItem()`을 사용해 쓰기 직후 동일 값을 다시 읽어 검증합니다.
+
+가져오기 순서:
+
+```text
+파일 파싱
+→ product/schema/payload/checksum 검증
+→ save/settings/runHistory 화이트리스트 정규화
+→ echoRiftImportStagingV1:* 임시 키에 쓰기
+→ 임시 키 다시 읽기 확인
+→ 현재 SAVE/SETTINGS/RUN_HISTORY 스냅숏을 IMPORT_BACKUP_KEY에 저장
+→ 실제 키로 커밋
+→ 실패 시 기존 스냅숏 복원
+```
+
+설정 화면에는 `마지막 가져오기 되돌리기` 버튼을 추가했습니다. 백업이 없으면 비활성화되고, 복원 성공 뒤 백업 키를 제거한 다음 새로고침합니다.
+
+## 정규화 경계
+
+저장 데이터는 알려진 save 필드와 `defaultMeta` 키만 남깁니다. boolean은 명시적 `true`만 인정하고, 숫자 필드는 유한 number만 받아 범위 안으로 보정합니다. meta 연구값은 실제 연구 노드 상한에 맞춰 클램프합니다.
+
+설정 데이터는 `defaultSettings`의 키만 순회해 number/boolean/enum을 정규화합니다. 알 수 없는 설정 키와 잘못된 타입은 저장되지 않습니다.
+
+## 서비스워커 폴백
+
+`CACHE_NAME`은 `echo-rift-hardening-v6.10.0`입니다. fetch 전략은 요청 종류별로 분리했습니다.
+
+- `request.mode === 'navigate'`: 네트워크 우선, 실패 시에만 캐시된 `index.html` 반환
+- 스크립트·CSS·이미지·manifest 등 에셋: 캐시 우선, 네트워크 실패 시 `Response.error()`
+- 동일 출처이면서 `response.ok`인 응답만 런타임 캐시에 저장
+- `cache.put()`은 await해 404나 불완전 응답을 숨기지 않습니다.
+
+## 접근성
+
+viewport에서 `user-scalable=no`를 제거해 브라우저 확대를 허용했습니다. 게임 플레이 중 의도하지 않은 터치 확대와 스크롤은 기존처럼 캔버스와 터치 조작 영역의 `touch-action`으로 제한합니다.
+
+---
 
 ## 6.9 목표
 

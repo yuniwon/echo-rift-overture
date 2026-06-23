@@ -103,10 +103,11 @@
   const SETTINGS_KEY = 'echoRiftSettingsV1';
   const RUN_HISTORY_KEY = 'echoRiftRunHistoryV1';
   const IMPORT_BACKUP_KEY = 'echoRiftImportBackupV1';
+  const IMPORT_STAGING_PREFIX = 'echoRiftImportStagingV1';
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '6.9.0';
+  const GAME_VERSION = '6.10.0';
   const MAX_ENEMY_BULLETS = 680;
   const MAX_PLAYER_BULLETS = 360;
   const WORLD_UNITS_PER_METER = 10;
@@ -193,6 +194,25 @@
     combatPalette: 'default',
     projectileShapes: true,
   };
+  const SETTING_ENUMS = {
+    graphicsMode: ['auto', 'high', 'balanced', 'performance'],
+    hudMode: ['adaptive', 'compact', 'detailed'],
+    damageNumbers: ['full', 'reduced', 'minimal'],
+    echoControlMode: ['adaptive', 'hold', 'toggle', 'instant'],
+    echoReportMode: ['adaptive', 'detailed', 'compact', 'sector'],
+    touchControlsMode: ['auto', 'always', 'hidden'],
+    tutorialTimingMode: ['adaptive', 'relaxed', 'strict'],
+    combatPalette: ['default', 'deuteranopia', 'tritanopia', 'mono'],
+  };
+  const SETTING_NUMBER_RANGES = {
+    master: [0, 1],
+    musicVolume: [0, 1],
+    sfxVolume: [0, 1],
+    uiVolume: [0, 1],
+    uiScale: [0.9, 1.6],
+    autoQualityTier: [0, 2, true],
+    flashIntensity: [0, 1],
+  };
 
   // Owner colours per accessibility palette. Shape language is constant across palettes;
   // only the colour mapping changes so colour-vision users still read ownership by hue.
@@ -217,10 +237,60 @@
   }
 
   function saveJSON(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* localStorage may be disabled */ }
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  const settings = loadJSON(SETTINGS_KEY, defaultSettings);
+  function settingNumber(value, fallback, min, max, integer = false) {
+    const numeric = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    const clamped = clamp(numeric, min, max);
+    return integer ? Math.floor(clamped) : clamped;
+  }
+
+  function settingBoolean(value, fallback) {
+    return typeof value === 'boolean' ? value : fallback;
+  }
+
+  function settingEnum(value, fallback, allowed) {
+    return typeof value === 'string' && allowed.includes(value) ? value : fallback;
+  }
+
+  function hasOwnValue(object, key) {
+    return Object.prototype.hasOwnProperty.call(object, key);
+  }
+
+  function normalizeSettingsData(raw = {}) {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    const normalized = {};
+    for (const [key, fallback] of Object.entries(defaultSettings)) {
+      if (hasOwnValue(SETTING_NUMBER_RANGES, key)) {
+        const [min, max, integer = false] = SETTING_NUMBER_RANGES[key];
+        normalized[key] = settingNumber(source[key], fallback, min, max, integer);
+      } else if (hasOwnValue(SETTING_ENUMS, key)) {
+        normalized[key] = settingEnum(source[key], fallback, SETTING_ENUMS[key]);
+      } else if (typeof fallback === 'boolean') {
+        normalized[key] = settingBoolean(source[key], fallback);
+      } else {
+        normalized[key] = fallback;
+      }
+    }
+    return normalized;
+  }
+
+  function loadSettingsData() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return normalizeSettingsData(raw ? JSON.parse(raw) : {});
+    } catch (_) {
+      return normalizeSettingsData({});
+    }
+  }
+
+  const settings = loadSettingsData();
   try {
     const migrationKey = 'echoRiftResonanceUiMigratedV5';
     if (!localStorage.getItem(migrationKey)) {
@@ -244,6 +314,20 @@
     arsenal: 0,
     defiance: 0,
   };
+  const metaImportMax = {
+    vitality: 8,
+    force: 10,
+    cadence: 8,
+    barrier: 8,
+    reflex: 6,
+    resonance: 8,
+    memory: 8,
+    luck: 8,
+    salvage: 8,
+    reroll: 3,
+    arsenal: 4,
+    defiance: 2,
+  };
 
   function saveDataDefaults() {
     return {
@@ -263,17 +347,23 @@
   function normalizeSaveData(raw = {}) {
     const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
     const metaSource = source.meta && typeof source.meta === 'object' && !Array.isArray(source.meta) ? source.meta : {};
+    const meta = {};
+    for (const id of Object.keys(defaultMeta)) {
+      const value = metaSource[id];
+      const max = metaImportMax[id] ?? 99;
+      meta[id] = typeof value === 'number' && Number.isFinite(value) ? clamp(Math.floor(value), 0, max) : 0;
+    }
     return {
-      ...saveDataDefaults(),
-      ...source,
-      bestScore: Math.max(0, Math.floor(Number(source.bestScore) || 0)),
-      bestTime: Math.max(0, Number(source.bestTime) || 0),
-      bestSector: Math.max(1, Number(source.bestSector) || 1),
-      runs: Math.max(0, Math.floor(Number(source.runs) || 0)),
-      wins: Math.max(0, Math.floor(Number(source.wins) || 0)),
-      cores: Math.max(0, Math.floor(Number(source.cores) || 0)),
-      totalCores: Math.max(0, Math.floor(Number(source.totalCores) || 0)),
-      meta: { ...defaultMeta, ...metaSource },
+      bestScore: typeof source.bestScore === 'number' && Number.isFinite(source.bestScore) ? Math.max(0, Math.floor(source.bestScore)) : 0,
+      bestTime: typeof source.bestTime === 'number' && Number.isFinite(source.bestTime) ? Math.max(0, source.bestTime) : 0,
+      bestSector: typeof source.bestSector === 'number' && Number.isFinite(source.bestSector) ? Math.max(1, Math.floor(source.bestSector)) : 1,
+      runs: typeof source.runs === 'number' && Number.isFinite(source.runs) ? Math.max(0, Math.floor(source.runs)) : 0,
+      wins: typeof source.wins === 'number' && Number.isFinite(source.wins) ? Math.max(0, Math.floor(source.wins)) : 0,
+      tutorialSeen: source.tutorialSeen === true,
+      advancedTutorialSeen: source.advancedTutorialSeen === true,
+      cores: typeof source.cores === 'number' && Number.isFinite(source.cores) ? Math.max(0, Math.floor(source.cores)) : 0,
+      totalCores: typeof source.totalCores === 'number' && Number.isFinite(source.totalCores) ? Math.max(0, Math.floor(source.totalCores)) : 0,
+      meta,
     };
   }
 
@@ -294,6 +384,62 @@
     return JSON.parse(JSON.stringify(value ?? null));
   }
 
+  function strictSetItem(key, serializedValue) {
+    localStorage.setItem(key, serializedValue);
+    if (localStorage.getItem(key) !== serializedValue) {
+      throw new Error('브라우저 저장소에 쓴 값을 다시 확인하지 못했습니다.');
+    }
+  }
+
+  function strictSetJSON(key, value) {
+    const serialized = JSON.stringify(value);
+    strictSetItem(key, serialized);
+    return serialized;
+  }
+
+  function strictRemoveItem(key) {
+    localStorage.removeItem(key);
+    if (localStorage.getItem(key) !== null) {
+      throw new Error('브라우저 저장소 값을 삭제하지 못했습니다.');
+    }
+  }
+
+  function storageSnapshot() {
+    return {
+      save: localStorage.getItem(SAVE_KEY),
+      settings: localStorage.getItem(SETTINGS_KEY),
+      history: localStorage.getItem(RUN_HISTORY_KEY),
+      backedUpAt: new Date().toISOString(),
+    };
+  }
+
+  function restoreStorageSnapshot(snapshot) {
+    const pairs = [
+      [SAVE_KEY, snapshot?.save ?? null],
+      [SETTINGS_KEY, snapshot?.settings ?? null],
+      [RUN_HISTORY_KEY, snapshot?.history ?? null],
+    ];
+    for (const [key, value] of pairs) {
+      if (value === null) strictRemoveItem(key);
+      else strictSetItem(key, String(value));
+    }
+  }
+
+  function clearImportStaging() {
+    for (const suffix of ['save', 'settings', 'history']) {
+      try { localStorage.removeItem(`${IMPORT_STAGING_PREFIX}:${suffix}`); } catch (_) { /* best effort cleanup */ }
+    }
+  }
+
+  function stageImportPayload(imported) {
+    clearImportStaging();
+    return {
+      save: strictSetJSON(`${IMPORT_STAGING_PREFIX}:save`, imported.save),
+      settings: imported.settings ? strictSetJSON(`${IMPORT_STAGING_PREFIX}:settings`, imported.settings) : null,
+      history: strictSetJSON(`${IMPORT_STAGING_PREFIX}:history`, { version: 1, list: imported.runHistory }),
+    };
+  }
+
   function assertPlainObject(value, label) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       throw new Error(`${label} 형식이 올바르지 않습니다.`);
@@ -307,7 +453,7 @@
 
   function sanitizeImportedSettings(raw) {
     assertPlainObject(raw, '설정');
-    return { ...defaultSettings, ...raw };
+    return normalizeSettingsData(raw);
   }
 
   async function sha256Text(text) {
@@ -377,23 +523,78 @@
   }
 
   async function importSaveFile(file) {
+    const before = storageSnapshot();
     try {
       const imported = await parseImportFile(file);
-      const backup = {
-        save: localStorage.getItem(SAVE_KEY),
-        settings: localStorage.getItem(SETTINGS_KEY),
-        history: localStorage.getItem(RUN_HISTORY_KEY),
-        backedUpAt: new Date().toISOString(),
-      };
-      saveJSON(IMPORT_BACKUP_KEY, backup);
-      saveJSON(SAVE_KEY, imported.save);
-      if (imported.settings) saveJSON(SETTINGS_KEY, imported.settings);
-      saveJSON(RUN_HISTORY_KEY, { version: 1, list: imported.runHistory });
+      const staged = stageImportPayload(imported);
+      strictSetJSON(IMPORT_BACKUP_KEY, before);
+      strictSetItem(SAVE_KEY, staged.save);
+      if (staged.settings !== null) strictSetItem(SETTINGS_KEY, staged.settings);
+      strictSetItem(RUN_HISTORY_KEY, staged.history);
+      clearImportStaging();
+      updateImportBackupStatus();
       showToast('저장을 불러왔습니다. 다시 시작합니다...', 1700);
       window.setTimeout(() => location.reload(), 650);
     } catch (err) {
-      console.error('Import failed:', err);
+      try {
+        restoreStorageSnapshot(before);
+        clearImportStaging();
+      } catch (rollbackErr) {
+        console.error('Import rollback failed:', rollbackErr);
+      }
+      console.warn('Import failed:', err);
       showToast(err?.message || '저장 파일을 불러오지 못했습니다.', 3000);
+    }
+  }
+
+  function loadImportBackup() {
+    try {
+      const raw = localStorage.getItem(IMPORT_BACKUP_KEY);
+      if (!raw) return null;
+      const backup = JSON.parse(raw);
+      if (!backup || typeof backup !== 'object' || Array.isArray(backup)) return null;
+      return {
+        save: typeof backup.save === 'string' ? backup.save : null,
+        settings: typeof backup.settings === 'string' ? backup.settings : null,
+        history: typeof backup.history === 'string' ? backup.history : null,
+        backedUpAt: typeof backup.backedUpAt === 'string' ? backup.backedUpAt : '',
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function updateImportBackupStatus() {
+    const button = $('#restoreImportBackupBtn');
+    const status = $('#importBackupStatus');
+    if (!button && !status) return;
+    const backup = loadImportBackup();
+    if (button) button.disabled = !backup;
+    if (status) {
+      status.textContent = backup
+        ? `마지막 가져오기 백업: ${backup.backedUpAt ? new Date(backup.backedUpAt).toLocaleString() : '보관됨'}`
+        : '되돌릴 가져오기 백업이 없습니다.';
+    }
+  }
+
+  function restoreImportBackup() {
+    const backup = loadImportBackup();
+    if (!backup) {
+      showToast('되돌릴 가져오기 백업이 없습니다.', 2200);
+      updateImportBackupStatus();
+      return;
+    }
+    const before = storageSnapshot();
+    try {
+      restoreStorageSnapshot(backup);
+      strictRemoveItem(IMPORT_BACKUP_KEY);
+      updateImportBackupStatus();
+      showToast('마지막 가져오기를 되돌렸습니다. 다시 시작합니다...', 1800);
+      window.setTimeout(() => location.reload(), 650);
+    } catch (err) {
+      try { restoreStorageSnapshot(before); } catch (rollbackErr) { console.error('Import undo rollback failed:', rollbackErr); }
+      console.error('Import undo failed:', err);
+      showToast(err?.message || '가져오기 되돌리기에 실패했습니다.', 3000);
     }
   }
 
@@ -7879,9 +8080,10 @@
     event.target.value = '';
     if (file) importSaveFile(file);
   });
+  $('#restoreImportBackupBtn')?.addEventListener('click', restoreImportBackup);
   $('#clearRunHistoryBtn')?.addEventListener('click', clearRunHistory);
   $('#howBtn').addEventListener('click', () => showScreen(UI.how));
-  $('#settingsBtn').addEventListener('click', () => { renderRunHistory(); showScreen(UI.settings); });
+  $('#settingsBtn').addEventListener('click', () => { renderRunHistory(); updateImportBackupStatus(); showScreen(UI.settings); });
   $$('[data-back-menu]').forEach((button) => button.addEventListener('click', returnToMenu));
 
   let lastAudioHoverControl = null;
@@ -8148,6 +8350,7 @@
         fireRate: player ? Number(player.fireRate.toFixed(2)) : null,
         moveSpeed: player ? Number(player.speed.toFixed(1)) : null,
         level: player?.level || 0,
+        rerolls: player?.rerolls || 0,
         pendingLevelUps,
         choices: currentUpgradeChoices.map((choice) => ({ id: choice.upgrade.id, rarity: choice.rarityKey })),
         lockedChoiceIds: [...lockedUpgradeIds],
@@ -8247,7 +8450,7 @@
         },
         reroll: () => {
           rerollUpgradeChoices();
-          return window.echoRiftStatus.choices;
+          return window.echoRiftStatus;
         },
         audioStatus: () => audio.status(),
         audioTest: async () => {
@@ -8453,7 +8656,6 @@
           if (pendingLevelUps > 0) openUpgradeScreen();
           return true;
         },
-        reroll: () => rerollUpgradeChoices(),
         choose: (index = 0) => {
           if (gameState !== 'upgrade') return false;
           const choice = currentUpgradeChoices[Math.max(0, Math.min(currentUpgradeChoices.length - 1, Math.floor(index)))];

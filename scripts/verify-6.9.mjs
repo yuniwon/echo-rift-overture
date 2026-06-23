@@ -86,7 +86,7 @@ function assertImportExport() {
   check('export envelope has product/schema/version/checksum/payload', ['product: \'ECHO_RIFT\'', 'exportSchemaVersion', 'gameVersion', 'checksum', 'payload'].every((text) => includes(files.game, text)));
   check('import parser rejects >1MB', match(functionBody(files.game, 'parseImportFile'), /file\.size\s*>\s*MAX_IMPORT_BYTES/));
   check('import parser checks product/schema/payload/checksum', ['envelope.product', 'exportSchemaVersion', 'payload.save', 'checksum !== envelope.checksum'].every((text) => includes(files.game, text)));
-  check('import backs up before apply', importBody.indexOf('saveJSON(IMPORT_BACKUP_KEY') >= 0 && importBody.indexOf('saveJSON(IMPORT_BACKUP_KEY') < importBody.indexOf('saveJSON(SAVE_KEY'));
+  check('import backs up before apply', importBody.indexOf('strictSetJSON(IMPORT_BACKUP_KEY') >= 0 && importBody.indexOf('strictSetJSON(IMPORT_BACKUP_KEY') < importBody.indexOf('strictSetItem(SAVE_KEY'));
   check('import failure path does not restore over current state', !/catch[\s\S]{0,500}saveJSON\(SAVE_KEY/.test(importBody));
   check('export/import UI ids exist', ['includeSettingsExport', 'exportSaveBtn', 'importSaveInput', 'runHistoryList', 'clearRunHistoryBtn'].every((id) => includes(files.html, `id="${id}"`)));
   check('export/import events are bound', ['#exportSaveBtn', '#importSaveInput', '#clearRunHistoryBtn'].every((selector) => includes(files.game, selector)));
@@ -105,15 +105,15 @@ function assertRunHistory() {
 
 function assertReleaseMetadata() {
   const manifest = JSON.parse(files.manifest);
-  check('manifest version name updated', manifest.name === 'ECHO RIFT: OVERTURE 6.9 — INTENT', manifest.name);
-  check('service worker cache updated', includes(files.sw, "const CACHE_NAME = 'echo-rift-intent-v6.9.0';"));
-  check('title updated', includes(files.html, 'ECHO RIFT: OVERTURE 6.9'));
-  check('edition badge updated', includes(files.html, 'OVERTURE 6.9 · INTENT'));
-  check('VERSION updated', includes(files.version, 'Version 6.9.0') && includes(files.version, 'Codename: INTENT'));
-  check('README updated', includes(files.readme, '6.9') && includes(files.readme, 'INTENT'));
-  check('CHANGELOG has 6.9.0 first section', match(files.changelog, /^# .+\r?\n\r?\n## 6\.9\.0 — OVERTURE \/ INTENT/m));
-  check('TECHNICAL_NOTES updated', includes(files.technical, '6.9') && includes(files.technical, '부분 리롤'));
-  check('QA_REPORT updated', includes(files.qa, '6.9') && includes(files.qa, 'INTENT'));
+  check('manifest product name is player-facing', manifest.name === 'ECHO RIFT: OVERTURE', manifest.name);
+  check('service worker cache updated', includes(files.sw, "const CACHE_NAME = 'echo-rift-hardening-v6.10.0';"));
+  check('title updated', includes(files.html, 'ECHO RIFT: OVERTURE'));
+  check('edition badge updated', includes(files.html, 'v6.10 · HARDENING'));
+  check('VERSION updated', includes(files.version, 'Version 6.10.0') && includes(files.version, 'Codename: HARDENING'));
+  check('README updated', includes(files.readme, '6.10') && includes(files.readme, 'HARDENING'));
+  check('CHANGELOG has 6.10.0 first section', match(files.changelog, /^# .+\r?\n\r?\n## 6\.10\.0 — OVERTURE \/ HARDENING/m));
+  check('TECHNICAL_NOTES updated', includes(files.technical, '6.10') && includes(files.technical, 'verify-6.10-hardening'));
+  check('QA_REPORT updated', includes(files.qa, '6.10') && includes(files.qa, 'HARDENING'));
 }
 
 assertNoDuplicateHtmlIds();

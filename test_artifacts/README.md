@@ -5,6 +5,7 @@ This directory stores repeatable quality-loop evidence for `ECHO RIFT: OVERTURE 
 Current contents:
 
 - `iteration-00-metrics.json` — prompt-intake baseline command results and known missing evidence.
+- `iteration-01-metrics.json` — 6.10 hardening behavior-test results and remaining evidence gaps.
 
 Expected future artifact naming:
 

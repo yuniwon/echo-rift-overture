@@ -1,5 +1,37 @@
 # 변경 내역
 
+## 6.10.0 — OVERTURE / HARDENING
+
+### 행동 기반 QA
+
+- `scripts/verify-6.10-hardening.mjs` 추가
+- Playwright로 카드 잠금·부분 리롤, 전부 잠금 리롤 미소비, 저장 가져오기/되돌리기, import 거부, 보스 인트로 정지, 경로 예고/실제 수치 일치 검증
+- QA 상태에 현재 리롤 수를 읽기 전용으로 노출
+- 중복 선언되어 상태 반환을 덮어쓰던 QA `reroll` 훅 정리
+
+### 저장 가져오기 하드닝
+
+- import 경로를 임시 키 쓰기/읽기 검증 뒤 실제 키로 커밋하도록 변경
+- 실패 시 기존 save/settings/runHistory 스냅숏 자동 복원
+- 설정 화면에 마지막 가져오기 되돌리기 버튼 추가
+- save/settings import를 화이트리스트 정규화하고 unknown key와 잘못된 타입 제거
+- checksum 문구를 안전성 보장이 아닌 파일 무결성 확인으로 정정
+
+### 서비스워커와 접근성
+
+- 서비스워커 cache name을 `echo-rift-hardening-v6.10.0`으로 갱신
+- `index.html` 폴백을 문서 탐색 요청으로 제한
+- 스크립트·CSS·이미지·manifest 요청 실패 시 `Response.error()` 반환
+- 동일 출처의 `response.ok` 응답만 캐시에 저장
+- viewport의 `user-scalable=no` 제거
+- manifest 앱 이름을 버전명보다 게임명 중심으로 정리
+
+### 검증
+
+- `node --check js/game.js`, `node --check sw.js`
+- `node scripts/verify-6.9.mjs`
+- `node scripts/verify-6.10-hardening.mjs`
+
 ## 6.9.0 — OVERTURE / INTENT
 
 ### 선택 통제: 카드 잠금과 부분 리롤

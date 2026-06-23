@@ -1,0 +1,67 @@
+{
+  "iteration": "1",
+  "type": "hardening_behavior_proof",
+  "timestamp": "2026-06-24T00:00:00+09:00",
+  "build": {
+    "name": "ECHO RIFT: OVERTURE",
+    "version": "6.10.0",
+    "codename": "HARDENING"
+  },
+  "runtimeChanges": [
+    "strict import staging and rollback",
+    "import undo control",
+    "request-type-aware service worker fallback",
+    "browser zoom allowed",
+    "read-only reroll count in QA status"
+  ],
+  "checks": [
+    {
+      "command": "node --check js/game.js",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node --check sw.js",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node --check scripts/verify-6.10-hardening.mjs",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node scripts/verify-6.9.mjs",
+      "exitCode": 0,
+      "stdout": "verify-6.9 passed",
+      "stderr": ""
+    },
+    {
+      "command": "node scripts/verify-6.10-hardening.mjs",
+      "exitCode": 0,
+      "stdout": "verify-6.10-hardening passed",
+      "stderr": ""
+    }
+  ],
+  "behaviorCoverage": {
+    "partialRerollLockedSlots": "passed",
+    "allLockedRerollNoSpend": "passed",
+    "saveImportRoundTrip": "passed",
+    "saveImportUndo": "passed",
+    "damagedChecksumRejected": "passed",
+    "futureSchemaRejected": "passed",
+    "oversizedImportRejected": "passed",
+    "bossIntroProtection": "passed",
+    "routeForecastMatchesActual": "passed"
+  },
+  "remainingEvidence": {
+    "requiredViewportScreenshots": "not_run",
+    "ninetySecondCombatMetrics": "not_run",
+    "audioListening": "requires_human_validation",
+    "physicalGamepad": "requires_hardware_validation",
+    "lowEndMobile": "requires_hardware_validation"
+  }
+}

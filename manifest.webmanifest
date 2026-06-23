@@ -1,7 +1,7 @@
 {
-  "name": "ECHO RIFT: OVERTURE 6.9 — INTENT",
+  "name": "ECHO RIFT: OVERTURE",
   "short_name": "ECHO RIFT",
-  "description": "강화 선택지 잠금과 부분 리롤, 오프라인 저장 내보내기·가져오기, 최근 런 기록을 더한 브라우저 액션 로그라이트.",
+  "description": "최근 3초의 행동을 기록해 과거의 자신과 교차 사격하는 오프라인 브라우저 액션 로그라이트.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",

@@ -35,4 +35,4 @@
 
 ## 완료 판정
 
-이 패스는 품질 루프의 시작 조건을 정리한 것이며, 프롬프트의 최종 stopping condition을 만족했다고 주장하지 않는다. 다음 반복은 `test_artifacts/`에 실제 스크린샷과 metric JSON을 생성하는 Iteration 0B가 되어야 한다.
+이 패스는 품질 루프의 시작 조건을 정리한 것이며, 프롬프트의 최종 stopping condition을 만족했다고 주장하지 않는다. Iteration 1에서 행동 기반 Playwright 검증과 import/service-worker 하드닝을 추가했지만, required viewport screenshot set과 90초 전투 계측은 아직 별도 반복이 필요하다.

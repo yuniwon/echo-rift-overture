@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#050817" />
   <meta name="description" content="현재의 나와 고정한 과거가 같은 적을 공격해 위상 균열을 여는 브라우저 액션 로그라이트." />
-  <title>ECHO RIFT: OVERTURE 6.9 — INTENT, 선택과 저장을 통제하다</title>
+  <title>ECHO RIFT: OVERTURE — 3초 전의 나와 교차 사격하는 액션 로그라이트</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
@@ -143,7 +143,7 @@
         <div class="menu-signal-row"><span class="signal-dot"></span><span>ARCHIVE SIGNAL ONLINE</span><b>06</b></div>
         <div class="logo-lockup">
           <div class="logo-mark" aria-hidden="true"><span class="orbit o1"></span><span class="orbit o2"></span><span class="core"></span></div>
-          <div><p class="eyebrow">DESIGN THREE SECONDS. FIGHT THEM TWICE.</p><div class="edition-badge">OVERTURE 6.9 · INTENT</div></div>
+          <div><p class="eyebrow">DESIGN THREE SECONDS. FIGHT THEM TWICE.</p><div class="edition-badge">v6.10 · HARDENING</div></div>
         </div>
         <h1>ECHO <span>RIFT</span></h1>
         <p class="kicker">시간의 잔향</p>
@@ -247,7 +247,8 @@
           <div class="setting-group data-group"><h3>데이터</h3>
             <label class="setting-row"><span><b>설정 포함 내보내기</b><small>화면·소리·접근성 설정을 저장 파일에 함께 보관</small></span><input id="includeSettingsExport" type="checkbox" checked /></label>
             <div class="setting-row data-action-row"><span><b>진행 내보내기</b><small>현재 진행과 최근 런 기록을 JSON 파일로 저장</small></span><button id="exportSaveBtn" class="btn compact-btn" type="button"><svg><use href="#icon-archive"></use></svg><span>내보내기</span></button></div>
-            <div class="setting-row data-action-row"><span><b>진행 가져오기</b><small>적용 전 현재 저장을 자동 백업</small></span><label class="btn compact-btn import-save-label" for="importSaveInput"><svg><use href="#icon-route"></use></svg><span>가져오기</span></label><input id="importSaveInput" type="file" accept="application/json" hidden /></div>
+            <div class="setting-row data-action-row"><span><b>진행 가져오기</b><small>파일 무결성 확인 후 현재 저장을 자동 백업</small></span><label class="btn compact-btn import-save-label" for="importSaveInput"><svg><use href="#icon-route"></use></svg><span>가져오기</span></label><input id="importSaveInput" type="file" accept="application/json" hidden /></div>
+            <div class="setting-row data-action-row"><span><b>마지막 가져오기 되돌리기</b><small id="importBackupStatus">되돌릴 가져오기 백업이 없습니다.</small></span><button id="restoreImportBackupBtn" class="btn compact-btn" type="button" disabled><svg><use href="#icon-reroll"></use></svg><span>되돌리기</span></button></div>
             <div class="setting-row run-history-row"><span><b>최근 런 기록</b><small>최대 20개 요약만 이 기기에 보관</small></span><button id="clearRunHistoryBtn" class="btn compact-btn danger" type="button"><svg><use href="#icon-reroll"></use></svg><span>기록 초기화</span></button></div>
             <div id="runHistoryList" class="run-history-list" aria-live="polite">아직 보관된 런 기록이 없습니다.</div>
           </div>
