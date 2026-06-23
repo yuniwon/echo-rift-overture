@@ -1,0 +1,12 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+
+# bkit tooling session metadata (not part of the game)
+docs/.bkit-memory.json
+docs/.pdca-status.json
+
+# Claude Code local (machine-specific) settings
+.claude/settings.local.json
