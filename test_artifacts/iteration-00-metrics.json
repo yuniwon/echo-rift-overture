@@ -1,0 +1,48 @@
+{
+  "iteration": "0A",
+  "type": "prompt_intake_baseline",
+  "timestamp": "2026-06-23T23:38:51.3890442+09:00",
+  "build": {
+    "name": "ECHO RIFT: OVERTURE",
+    "version": "6.9.0",
+    "codename": "INTENT",
+    "baselineCommit": "bc4e0262b64c85f8d2adff9b2c5679eb97b013a0"
+  },
+  "promptSource": "C:/Users/WON2/Downloads/ECHO_RIFT_v6.3_QUALITY_LOOP_PROMPT(2).md",
+  "runtimeChanges": false,
+  "checks": [
+    {
+      "command": "node --check js/game.js",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node --check sw.js",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node scripts/verify-6.9.mjs",
+      "exitCode": 0,
+      "stdout": "verify-6.9 passed",
+      "stderr": ""
+    }
+  ],
+  "qualityLoopCoverage": {
+    "qualityPlan": "created",
+    "progressLog": "created",
+    "qualityReport": "created",
+    "screenshotSet": "not_run",
+    "motionCapture": "not_run",
+    "ninetySecondCombatMetrics": "not_run",
+    "audioListening": "requires_human_validation",
+    "physicalGamepad": "requires_hardware_validation",
+    "lowEndMobile": "requires_hardware_validation"
+  },
+  "nextIteration": {
+    "id": "0B",
+    "goal": "Create and run a gated QA capture harness that writes screenshots, console status, and metric JSON for required first-ten-minute states."
+  }
+}
