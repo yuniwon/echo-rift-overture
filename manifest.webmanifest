@@ -1,7 +1,7 @@
 {
-  "name": "ECHO RIFT: OVERTURE 6.6 — 보스 인트로 전투 정지",
+  "name": "ECHO RIFT: OVERTURE 6.8 — SIGNAL",
   "short_name": "ECHO RIFT",
-  "description": "보스 등장 연출 동안 전투와 런 타이머를 완전히 멈추고, 배너 종료 뒤에만 보스가 생성되는 오프라인 브라우저 액션 로그라이트.",
+  "description": "현재·잔향·적 투사체를 색상과 형상으로 함께 구분하고, 색약 보정 팔레트와 고대비 결과 화면을 더한 오프라인 브라우저 액션 로그라이트.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",
