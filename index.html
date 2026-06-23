@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#050817" />
   <meta name="description" content="현재의 나와 고정한 과거가 같은 적을 공격해 위상 균열을 여는 브라우저 액션 로그라이트." />
-  <title>ECHO RIFT: OVERTURE 6.8 — 신호, 누구의 탄환인지 한눈에</title>
+  <title>ECHO RIFT: OVERTURE 6.9 — INTENT, 선택과 저장을 통제하다</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
@@ -143,7 +143,7 @@
         <div class="menu-signal-row"><span class="signal-dot"></span><span>ARCHIVE SIGNAL ONLINE</span><b>06</b></div>
         <div class="logo-lockup">
           <div class="logo-mark" aria-hidden="true"><span class="orbit o1"></span><span class="orbit o2"></span><span class="core"></span></div>
-          <div><p class="eyebrow">DESIGN THREE SECONDS. FIGHT THEM TWICE.</p><div class="edition-badge">OVERTURE 6.8 · SIGNAL</div></div>
+          <div><p class="eyebrow">DESIGN THREE SECONDS. FIGHT THEM TWICE.</p><div class="edition-badge">OVERTURE 6.9 · INTENT</div></div>
         </div>
         <h1>ECHO <span>RIFT</span></h1>
         <p class="kicker">시간의 잔향</p>
@@ -209,7 +209,7 @@
 
   <section id="settingsScreen" class="screen" aria-label="설정">
     <div class="panel screen-panel settings-panel scroll-panel">
-      <div class="panel-heading"><div><p class="eyebrow">SIGNAL CONTROL</p><h2>화면·사운드·성능 설정</h2><p>변경 사항은 즉시 적용되고 자동 저장됩니다.</p></div><div class="panel-index">LIVE</div></div>
+      <div class="panel-heading"><div><p class="eyebrow">INTENT CONTROL</p><h2>화면·사운드·성능 설정</h2><p>변경 사항은 즉시 적용되고 자동 저장됩니다.</p></div><div class="panel-index">LIVE</div></div>
       <div class="settings-layout">
         <div class="settings-list">
           <div class="setting-group audio-group"><h3>소리</h3>
@@ -243,6 +243,13 @@
             <label class="setting-row"><span><b>피격 섬광</b><small>화면 가장자리의 적색 경고 강도</small></span><div class="setting-control"><input id="flashIntensity" type="range" min="0" max="1" value="0.72" step="0.01" /><output id="flashIntensityValue">72%</output></div></label>
             <label class="setting-row"><span><b>움직임 줄이기</b><small>장식 애니메이션·잔상·카메라 움직임 감소</small></span><input id="motionToggle" type="checkbox" /></label>
             <label class="setting-row"><span><b>자동 사격</b><small>조준하는 동안 자동으로 발사</small></span><input id="autoFireToggle" type="checkbox" /></label>
+          </div>
+          <div class="setting-group data-group"><h3>데이터</h3>
+            <label class="setting-row"><span><b>설정 포함 내보내기</b><small>화면·소리·접근성 설정을 저장 파일에 함께 보관</small></span><input id="includeSettingsExport" type="checkbox" checked /></label>
+            <div class="setting-row data-action-row"><span><b>진행 내보내기</b><small>현재 진행과 최근 런 기록을 JSON 파일로 저장</small></span><button id="exportSaveBtn" class="btn compact-btn" type="button"><svg><use href="#icon-archive"></use></svg><span>내보내기</span></button></div>
+            <div class="setting-row data-action-row"><span><b>진행 가져오기</b><small>적용 전 현재 저장을 자동 백업</small></span><label class="btn compact-btn import-save-label" for="importSaveInput"><svg><use href="#icon-route"></use></svg><span>가져오기</span></label><input id="importSaveInput" type="file" accept="application/json" hidden /></div>
+            <div class="setting-row run-history-row"><span><b>최근 런 기록</b><small>최대 20개 요약만 이 기기에 보관</small></span><button id="clearRunHistoryBtn" class="btn compact-btn danger" type="button"><svg><use href="#icon-reroll"></use></svg><span>기록 초기화</span></button></div>
+            <div id="runHistoryList" class="run-history-list" aria-live="polite">아직 보관된 런 기록이 없습니다.</div>
           </div>
         </div>
         <aside class="settings-preview" aria-label="설정 미리보기">

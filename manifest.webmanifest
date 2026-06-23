@@ -1,7 +1,7 @@
 {
-  "name": "ECHO RIFT: OVERTURE 6.8 — SIGNAL",
+  "name": "ECHO RIFT: OVERTURE 6.9 — INTENT",
   "short_name": "ECHO RIFT",
-  "description": "현재·잔향·적 투사체를 색상과 형상으로 함께 구분하고, 색약 보정 팔레트와 고대비 결과 화면을 더한 오프라인 브라우저 액션 로그라이트.",
+  "description": "강화 선택지 잠금과 부분 리롤, 오프라인 저장 내보내기·가져오기, 최근 런 기록을 더한 브라우저 액션 로그라이트.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",

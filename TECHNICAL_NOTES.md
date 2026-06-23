@@ -1,3 +1,62 @@
+# ECHO RIFT: OVERTURE 6.9 — 기술 노트 (INTENT)
+
+## 6.9 목표
+
+선택 통제와 데이터 안전을 추가합니다. 강화 선택은 카드별 잠금과 부분 리롤을 지원하고, 브라우저 저장은 오프라인 JSON 내보내기·가져오기와 최근 런 기록으로 보강합니다. 신규 강화, 수치 밸런스, 텔레메트리, 외부 서비스는 추가하지 않았습니다.
+
+## 카드 잠금과 부분 리롤
+
+`currentUpgradeChoices` 옆에 `lockedUpgradeIds` Set을 추가했습니다. 잠금 기준은 `upgrade.id`입니다. 현재 선택 화면에서는 동일 id가 중복되지 않으므로 카드 정체성을 id와 `rarityKey`로 유지할 수 있습니다.
+
+`createUpgradeChoices(count, isReroll, options = {})`는 `options.excludeIds`를 받아 후보 풀에서 해당 id를 제외합니다. `rerollUpgradeChoices()`는 현재 카드 배열에서 잠긴 슬롯을 유지하고, 잠기지 않은 슬롯 수만큼 새 선택지를 생성해 원래 위치에 채웁니다. 모든 카드가 잠겼을 때는 리롤 버튼이 비활성화되고, 함수가 조기 반환해 `player.rerolls`를 소비하지 않습니다.
+
+잠금 상태는 `openUpgradeScreen()`과 `selectUpgrade()`에서 초기화합니다. 잠금 토글은 카드 내부 별도 컨트롤로 렌더링되며 클릭/Enter/Space 이벤트가 카드 선택 이벤트로 전파되지 않도록 분리했습니다.
+
+## 저장 내보내기와 가져오기
+
+새 상수:
+
+```text
+RUN_HISTORY_KEY = 'echoRiftRunHistoryV1'
+IMPORT_BACKUP_KEY = 'echoRiftImportBackupV1'
+EXPORT_SCHEMA_VERSION = 1
+MAX_IMPORT_BYTES = 1_000_000
+GAME_VERSION = '6.9.0'
+```
+
+내보내기는 `buildExportEnvelope()`가 다음 봉투를 만들고 `exportSaveFile()`이 Blob 다운로드를 수행합니다.
+
+```text
+{
+  product: 'ECHO_RIFT',
+  exportSchemaVersion,
+  gameVersion,
+  exportedAt,
+  checksum,
+  payload: { save, settings, runHistory }
+}
+```
+
+`checksum`은 `JSON.stringify(payload)`에 대한 SHA-256입니다. 구현은 `crypto.subtle.digest('SHA-256', ...)`를 사용합니다.
+
+가져오기는 `parseImportFile()`에서 파일 크기, product, schema version, payload/save plain object, checksum을 모두 검증한 뒤 sanitize된 save/settings/runHistory만 반환합니다. `importSaveFile()`은 이 검증이 끝난 후 현재 `SAVE_KEY`, `SETTINGS_KEY`, `RUN_HISTORY_KEY` 값을 `IMPORT_BACKUP_KEY`에 보관하고 새 값을 씁니다. 실패 경로에서는 저장 키를 다시 쓰지 않습니다.
+
+기존 `echoRiftSaveV2`와 `echoRiftSettingsV1` 키는 유지합니다. `loadSaveData()`의 기본값은 `saveDataDefaults()`와 `normalizeSaveData()`로 공용화해 기존 로드와 import sanitize가 같은 보정 규칙을 사용합니다.
+
+## 최근 런 기록
+
+런 기록은 `{ version: 1, list: [...] }` 형태로 `echoRiftRunHistoryV1`에 저장합니다. `validateRunHistory()`는 배열이 아닌 값, 알 수 없는 outcome, 비정상 숫자, 과도한 build 항목을 보정하거나 제외하며, 항상 `MAX_RUN_HISTORY = 20`개로 자릅니다.
+
+`appendRunHistory(outcome)`은 `runHistoryRecorded` 플래그로 한 런에서 한 번만 기록합니다. `startGame()`이 플래그를 초기화하고, `showVictory()`는 `win`, `endGame()`은 `death`를 기록합니다. 승리 뒤 끝없는 시간선으로 이어지는 흐름에서 같은 런이 중복 기록되지 않도록 이 플래그를 유지합니다.
+
+기록 요약은 점수, 구역, 시간, 레벨, 처치, 상위 빌드 계열, 잔향 피해 비중, 위상 균열 횟수/추가 피해, seed만 저장합니다. 탄환 프레임, 입력 샘플, 60Hz 전체 기록은 저장하지 않습니다.
+
+## UI와 접근성
+
+설정 화면에 데이터 그룹을 추가했습니다. 새 버튼은 기존 `.btn`/`.setting-row` 체계를 따르며, 작은 화면에서는 세로로 접히도록 보강했습니다. 강화 카드 잠금 컨트롤은 44px 이상 터치 목표, `aria-pressed`, 독립 포커스 상태를 갖습니다.
+
+---
+
 # ECHO RIFT: OVERTURE 6.8 — 기술 노트 (SIGNAL)
 
 ## 6.8 목표

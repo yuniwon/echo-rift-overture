@@ -101,6 +101,12 @@
   const SAVE_KEY = 'echoRiftSaveV2';
   const LEGACY_SAVE_KEY = 'echoRiftSaveV1';
   const SETTINGS_KEY = 'echoRiftSettingsV1';
+  const RUN_HISTORY_KEY = 'echoRiftRunHistoryV1';
+  const IMPORT_BACKUP_KEY = 'echoRiftImportBackupV1';
+  const EXPORT_SCHEMA_VERSION = 1;
+  const MAX_IMPORT_BYTES = 1_000_000;
+  const MAX_RUN_HISTORY = 20;
+  const GAME_VERSION = '6.9.0';
   const MAX_ENEMY_BULLETS = 680;
   const MAX_PLAYER_BULLETS = 360;
   const WORLD_UNITS_PER_METER = 10;
@@ -239,8 +245,8 @@
     defiance: 0,
   };
 
-  function loadSaveData() {
-    const defaults = {
+  function saveDataDefaults() {
+    return {
       bestScore: 0,
       bestTime: 0,
       bestSector: 1,
@@ -252,24 +258,246 @@
       totalCores: 0,
       meta: { ...defaultMeta },
     };
+  }
+
+  function normalizeSaveData(raw = {}) {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    const metaSource = source.meta && typeof source.meta === 'object' && !Array.isArray(source.meta) ? source.meta : {};
+    return {
+      ...saveDataDefaults(),
+      ...source,
+      bestScore: Math.max(0, Math.floor(Number(source.bestScore) || 0)),
+      bestTime: Math.max(0, Number(source.bestTime) || 0),
+      bestSector: Math.max(1, Number(source.bestSector) || 1),
+      runs: Math.max(0, Math.floor(Number(source.runs) || 0)),
+      wins: Math.max(0, Math.floor(Number(source.wins) || 0)),
+      cores: Math.max(0, Math.floor(Number(source.cores) || 0)),
+      totalCores: Math.max(0, Math.floor(Number(source.totalCores) || 0)),
+      meta: { ...defaultMeta, ...metaSource },
+    };
+  }
+
+  function loadSaveData() {
     try {
       const current = localStorage.getItem(SAVE_KEY);
       const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
       const parsed = current ? JSON.parse(current) : legacy ? JSON.parse(legacy) : {};
-      return {
-        ...defaults,
-        ...parsed,
-        bestSector: Math.max(1, Number(parsed.bestSector) || 1),
-        cores: Math.max(0, Math.floor(Number(parsed.cores) || 0)),
-        totalCores: Math.max(0, Math.floor(Number(parsed.totalCores) || 0)),
-        meta: { ...defaultMeta, ...(parsed.meta || {}) },
-      };
+      return normalizeSaveData(parsed);
     } catch (_) {
-      return defaults;
+      return saveDataDefaults();
     }
   }
 
   const saveData = loadSaveData();
+
+  function cloneSerializable(value) {
+    return JSON.parse(JSON.stringify(value ?? null));
+  }
+
+  function assertPlainObject(value, label) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`${label} 형식이 올바르지 않습니다.`);
+    }
+  }
+
+  function sanitizeImportedSave(raw) {
+    assertPlainObject(raw, '진행 저장');
+    return normalizeSaveData(raw);
+  }
+
+  function sanitizeImportedSettings(raw) {
+    assertPlainObject(raw, '설정');
+    return { ...defaultSettings, ...raw };
+  }
+
+  async function sha256Text(text) {
+    if (!crypto?.subtle) throw new Error('이 브라우저에서는 체크섬 검증을 사용할 수 없습니다.');
+    const bytes = new TextEncoder().encode(text);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function buildExportEnvelope(includeSettings = true) {
+    const payload = {
+      save: cloneSerializable(saveData),
+      settings: includeSettings ? cloneSerializable(settings) : null,
+      runHistory: loadRunHistory(),
+    };
+    const payloadText = JSON.stringify(payload);
+    return {
+      product: 'ECHO_RIFT',
+      exportSchemaVersion: EXPORT_SCHEMA_VERSION,
+      gameVersion: GAME_VERSION,
+      exportedAt: new Date().toISOString(),
+      checksum: await sha256Text(payloadText),
+      payload,
+    };
+  }
+
+  async function exportSaveFile() {
+    try {
+      const includeSettings = $('#includeSettingsExport')?.checked !== false;
+      const envelope = await buildExportEnvelope(includeSettings);
+      const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `echo-rift-save-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.rel = 'noopener';
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast('진행 저장을 내보냈습니다', 1700);
+    } catch (err) {
+      console.error('Export failed:', err);
+      showToast(err?.message || '내보내기에 실패했습니다', 2600);
+    }
+  }
+
+  async function parseImportFile(file) {
+    if (!file) throw new Error('가져올 파일을 선택하세요.');
+    if (file.size > MAX_IMPORT_BYTES) throw new Error('파일이 너무 큽니다. 1MB 이하의 저장 파일만 불러올 수 있습니다.');
+    let envelope;
+    try {
+      envelope = JSON.parse(await file.text());
+    } catch (_) {
+      throw new Error('JSON 파일을 읽을 수 없습니다.');
+    }
+    assertPlainObject(envelope, '내보내기 파일');
+    if (envelope.product !== 'ECHO_RIFT') throw new Error('ECHO RIFT 저장 파일이 아닙니다.');
+    if (Number(envelope.exportSchemaVersion) > EXPORT_SCHEMA_VERSION) throw new Error('더 새로운 버전에서 만든 저장 파일입니다.');
+    assertPlainObject(envelope.payload, '저장 내용');
+    assertPlainObject(envelope.payload.save, '진행 저장');
+    const checksum = await sha256Text(JSON.stringify(envelope.payload));
+    if (checksum !== envelope.checksum) throw new Error('체크섬이 일치하지 않습니다. 파일이 손상되었을 수 있습니다.');
+    return {
+      save: sanitizeImportedSave(envelope.payload.save),
+      settings: envelope.payload.settings ? sanitizeImportedSettings(envelope.payload.settings) : null,
+      runHistory: validateRunHistory(envelope.payload.runHistory || []),
+    };
+  }
+
+  async function importSaveFile(file) {
+    try {
+      const imported = await parseImportFile(file);
+      const backup = {
+        save: localStorage.getItem(SAVE_KEY),
+        settings: localStorage.getItem(SETTINGS_KEY),
+        history: localStorage.getItem(RUN_HISTORY_KEY),
+        backedUpAt: new Date().toISOString(),
+      };
+      saveJSON(IMPORT_BACKUP_KEY, backup);
+      saveJSON(SAVE_KEY, imported.save);
+      if (imported.settings) saveJSON(SETTINGS_KEY, imported.settings);
+      saveJSON(RUN_HISTORY_KEY, { version: 1, list: imported.runHistory });
+      showToast('저장을 불러왔습니다. 다시 시작합니다...', 1700);
+      window.setTimeout(() => location.reload(), 650);
+    } catch (err) {
+      console.error('Import failed:', err);
+      showToast(err?.message || '저장 파일을 불러오지 못했습니다.', 3000);
+    }
+  }
+
+  function normalizeRunHistoryEntry(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const outcome = raw.outcome === 'win' ? 'win' : raw.outcome === 'death' ? 'death' : null;
+    if (!outcome) return null;
+    const build = Array.isArray(raw.build)
+      ? raw.build.slice(0, 3).map((item) => ({
+          family: String(item?.family || ''),
+          label: String(item?.label || item?.family || ''),
+          rank: Math.max(0, Math.floor(Number(item?.rank) || 0)),
+        })).filter((item) => item.family)
+      : [];
+    const phase = raw.phaseRift && typeof raw.phaseRift === 'object' && !Array.isArray(raw.phaseRift) ? raw.phaseRift : {};
+    return {
+      endedAt: Number.isNaN(Date.parse(raw.endedAt)) ? new Date().toISOString() : String(raw.endedAt),
+      outcome,
+      score: Math.max(0, Math.floor(Number(raw.score) || 0)),
+      sector: Math.max(1, Math.floor(Number(raw.sector) || 1)),
+      timeSeconds: Math.max(0, Number(raw.timeSeconds) || 0),
+      level: Math.max(1, Math.floor(Number(raw.level) || 1)),
+      kills: Math.max(0, Math.floor(Number(raw.kills) || 0)),
+      build,
+      echoShare: clamp(Number(raw.echoShare) || 0, 0, 999),
+      phaseRift: {
+        procs: Math.max(0, Math.floor(Number(phase.procs) || 0)),
+        bonusDamage: Math.max(0, Math.round(Number(phase.bonusDamage) || 0)),
+      },
+      seed: raw.seed == null ? undefined : String(raw.seed),
+    };
+  }
+
+  function validateRunHistory(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(normalizeRunHistoryEntry).filter(Boolean).slice(0, MAX_RUN_HISTORY);
+  }
+
+  function loadRunHistory() {
+    const stored = loadJSON(RUN_HISTORY_KEY, { version: 1, list: [] });
+    return validateRunHistory(stored.list);
+  }
+
+  function saveRunHistory(list) {
+    saveJSON(RUN_HISTORY_KEY, { version: 1, list: validateRunHistory(list) });
+  }
+
+  function createRunSummary(outcome) {
+    const build = strongestFamilies().map(([family, rank]) => ({ family, label: familyInfo[family]?.label || family, rank }));
+    return {
+      endedAt: new Date().toISOString(),
+      outcome,
+      score: Math.floor(score),
+      sector: currentWave?.number || 1,
+      timeSeconds: Number(gameTime.toFixed(2)),
+      level: player?.level || 1,
+      kills,
+      build,
+      echoShare: runDamageTotal > 0 ? Number(clamp(echoDamageTotal / runDamageTotal * 100, 0, 999).toFixed(2)) : 0,
+      phaseRift: {
+        procs: phaseRiftProcs,
+        bonusDamage: Math.round(phaseRiftBonusDamage),
+      },
+      seed: runSeed ? String(runSeed) : undefined,
+    };
+  }
+
+  function renderRunHistory() {
+    const target = $('#runHistoryList');
+    if (!target) return;
+    const list = loadRunHistory();
+    if (!list.length) {
+      target.innerHTML = '<div class="run-history-empty">아직 보관된 런 기록이 없습니다.</div>';
+      return;
+    }
+    target.innerHTML = list.map((run, index) => {
+      const date = new Date(run.endedAt);
+      const dateLabel = Number.isNaN(date.getTime()) ? '시간 미상' : date.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const buildText = run.build.length ? run.build.map((item) => `${escapeHtml(item.label)} ${item.rank}`).join(' · ') : '빌드 미확립';
+      const outcome = run.outcome === 'win' ? '승리' : '붕괴';
+      return `<article class="run-history-item">
+        <header><b>#${index + 1} ${outcome}</b><span>${dateLabel}</span></header>
+        <p>점수 ${formatNumber(run.score)} · SECTOR ${String(run.sector).padStart(2, '0')} · ${formatTime(run.timeSeconds)} · L${run.level} · 처치 ${formatNumber(run.kills)}</p>
+        <p>${buildText} · 잔향 ${run.echoShare.toFixed(run.echoShare >= 10 ? 0 : 1)}% · 균열 ${run.phaseRift.procs}회 / +${formatNumber(run.phaseRift.bonusDamage)}</p>
+      </article>`;
+    }).join('');
+  }
+
+  function appendRunHistory(outcome) {
+    if (runHistoryRecorded) return;
+    runHistoryRecorded = true;
+    try {
+      saveRunHistory([createRunSummary(outcome), ...loadRunHistory()].slice(0, MAX_RUN_HISTORY));
+      renderRunHistory();
+    } catch (err) {
+      console.error('Run history failed:', err);
+    }
+  }
+
+  function clearRunHistory() {
+    saveRunHistory([]);
+    renderRunHistory();
+    showToast('최근 런 기록을 초기화했습니다', 1700);
+  }
 
   function applySettings() {
     settings.master = clamp(Number(settings.master ?? defaultSettings.master), 0, 1);
@@ -1606,10 +1834,12 @@
   let elitesKilled = 0;
   let lastCorePayout = 0;
   let runSettled = false;
+  let runHistoryRecorded = false;
   let runSeed = 0;
   let endlessMode = false;
   let pendingLevelUps = 0;
   let currentUpgradeChoices = [];
+  const lockedUpgradeIds = new Set();
   let activeDraftGuarantee = null;
   let activeDraftChoiceBonus = 0;
   let currentRoute = null;
@@ -3395,8 +3625,9 @@
     return weight;
   }
 
-  function createUpgradeChoices(count = 4, isReroll = false) {
-    const pool = upgrades.filter(upgradeEligible);
+  function createUpgradeChoices(count = 4, isReroll = false, options = {}) {
+    const excludeIds = options.excludeIds instanceof Set ? options.excludeIds : null;
+    const pool = upgrades.filter((upgrade) => upgradeEligible(upgrade) && !(excludeIds && excludeIds.has(upgrade.id)));
     const chosen = [];
     const excluded = new Set();
     while (chosen.length < count && excluded.size < pool.length) {
@@ -3447,6 +3678,18 @@
       .filter(([, rank]) => rank > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
+  }
+
+  function isChoiceLocked(choice) {
+    return Boolean(choice?.upgrade && lockedUpgradeIds.has(choice.upgrade.id));
+  }
+
+  function toggleUpgradeLock(choice) {
+    if (!choice?.upgrade) return;
+    const id = choice.upgrade.id;
+    if (lockedUpgradeIds.has(id)) lockedUpgradeIds.delete(id);
+    else lockedUpgradeIds.add(id);
+    renderUpgradeChoices(currentUpgradeChoices, false);
   }
 
   function updateBuildSummary() {
@@ -3516,7 +3759,8 @@
     UI.upgradeChoices.dataset.count = String(choices.length);
     updateBuildSummary();
     $('#rerollCount').textContent = formatNumber(player.rerolls);
-    $('#rerollBtn').disabled = player.rerolls <= 0;
+    const allLocked = choices.length > 0 && choices.every(isChoiceLocked);
+    $('#rerollBtn').disabled = player.rerolls <= 0 || allLocked;
     const bestRarity = choices.reduce((best, item) => rarityIndex(item.rarityKey) > rarityIndex(best) ? item.rarityKey : best, 'common');
     const routeDraftNote = activeDraftGuarantee ? ` · 경로 보상 ${rarityInfo[rarityAllowedForLevel(activeDraftGuarantee)].label.split(' · ')[1]} 이상` : '';
     $('#upgradeSubtitle').textContent = `강화 단계 ${player.level} · 최고 선택지 ${rarityInfo[bestRarity].label.split(' · ')[1]}${routeDraftNote} · 핵심 변화와 빌드 궁합을 비교하세요`;
@@ -3530,9 +3774,10 @@
       const description = splitUpgradeDescription(upgrade.describe(quality));
       const path = evolutionPathFor(upgrade);
       const rarityBonus = Math.round((quality.power - 1) * 100);
+      const locked = isChoiceLocked(choice);
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `upgrade-card${synergy ? ' synergy' : ''}${upgrade.evolution ? ' evolution' : ''}`;
+      button.className = `upgrade-card${synergy ? ' synergy' : ''}${upgrade.evolution ? ' evolution' : ''}${locked ? ' locked' : ''}`;
       button.dataset.rarity = rarityKey;
       button.dataset.family = upgrade.family;
       button.style.setProperty('--rarity-color', quality.color);
@@ -3554,6 +3799,25 @@
         ${path ? `<div class="upgrade-path${path.ready ? ' ready' : ''}">${path.html}</div>` : ''}
         <div class="upgrade-card-footer"><div><div class="upgrade-power">${family.role} · ${rarityBonus ? `+${rarityBonus}% 증폭` : '표준 출력'}</div><div class="upgrade-level">현재 ${rank} / 최대 ${upgrade.max}</div></div><div class="upgrade-hotkey">${index + 1}</div></div>
       `;
+      const lock = document.createElement('span');
+      lock.className = 'upgrade-lock';
+      lock.setAttribute('role', 'button');
+      lock.tabIndex = 0;
+      lock.setAttribute('aria-pressed', String(locked));
+      lock.setAttribute('aria-label', `${upgrade.name} ${locked ? '잠금 해제' : '잠금'}`);
+      lock.innerHTML = `${uiIcon('lock')}<span>${locked ? '고정' : '잠금'}</span>`;
+      lock.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleUpgradeLock(choice);
+      });
+      lock.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        toggleUpgradeLock(choice);
+      });
+      button.appendChild(lock);
       button.addEventListener('click', () => selectUpgrade(choice));
       UI.upgradeChoices.appendChild(button);
     });
@@ -3564,6 +3828,7 @@
     if (!player || gameState !== 'playing' || pendingLevelUps <= 0) return;
     input.cancelEcho('upgrade', false);
     input.echoRequestQueued = null;
+    lockedUpgradeIds.clear();
     pendingLevelUps--;
     gameState = 'upgrade';
     document.body.classList.add('choice-open');
@@ -3588,6 +3853,7 @@
     player.familyRanks[upgrade.family] = (player.familyRanks[upgrade.family] || 0) + (upgrade.evolution ? 3 : 1);
     player.level++;
     player.upgradesChosen++;
+    lockedUpgradeIds.clear();
     currentUpgradeChoices = [];
     activeDraftGuarantee = null;
     activeDraftChoiceBonus = 0;
@@ -3609,11 +3875,20 @@
 
   function rerollUpgradeChoices() {
     if (gameState !== 'upgrade' || !player || player.rerolls <= 0) return;
+    const locked = currentUpgradeChoices.filter(isChoiceLocked);
+    if (locked.length >= currentUpgradeChoices.length) {
+      showToast('모든 선택지를 잠갔습니다', 1300);
+      return;
+    }
+    const excludeIds = new Set(locked.map((choice) => choice.upgrade.id));
+    const needed = currentUpgradeChoices.length - locked.length;
+    const replacements = createUpgradeChoices(needed, true, { excludeIds });
     player.rerolls--;
-    const choices = createUpgradeChoices(player.choiceCount + activeDraftChoiceBonus, true);
-    renderUpgradeChoices(choices, false);
+    const nextChoices = currentUpgradeChoices.map((choice) => isChoiceLocked(choice) ? choice : replacements.shift()).filter(Boolean);
+    currentUpgradeChoices = nextChoices;
+    renderUpgradeChoices(currentUpgradeChoices, false);
     audio.reroll();
-    showToast('가능한 시간선을 다시 계산했습니다', 1200);
+    showToast('잠그지 않은 선택지만 다시 계산했습니다', 1200);
   }
 
 
@@ -4109,6 +4384,7 @@
     elitesKilled = 0;
     lastCorePayout = 0;
     runSettled = false;
+    runHistoryRecorded = false;
     endlessMode = false;
     pendingLevelUps = 0;
     currentUpgradeChoices = [];
@@ -6151,6 +6427,7 @@
     UI.syncSuccess?.classList.add('hidden');
     UI.echoReport?.classList.add('hidden');
     const earned = settleRun(1);
+    appendRunHistory('death');
     $('#finalScore').textContent = formatNumber(score);
     $('#finalTime').textContent = formatTime(gameTime);
     $('#finalWave').textContent = `SECTOR ${String(currentWave?.number || 1).padStart(2, '0')}`;
@@ -6193,6 +6470,7 @@
     UI.syncSuccess?.classList.add('hidden');
     UI.echoReport?.classList.add('hidden');
     saveData.wins++;
+    appendRunHistory('win');
     saveData.bestScore = Math.max(saveData.bestScore, Math.floor(score));
     saveData.bestTime = Math.max(saveData.bestTime, gameTime);
     saveData.bestSector = Math.max(saveData.bestSector || 1, 6);
@@ -7595,8 +7873,15 @@
   $('#gameOverMetaBtn').addEventListener('click', openMetaFromResult);
   $('#metaResetBtn').addEventListener('click', resetMetaProgression);
   $('#rerollBtn').addEventListener('click', rerollUpgradeChoices);
+  $('#exportSaveBtn')?.addEventListener('click', exportSaveFile);
+  $('#importSaveInput')?.addEventListener('change', (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) importSaveFile(file);
+  });
+  $('#clearRunHistoryBtn')?.addEventListener('click', clearRunHistory);
   $('#howBtn').addEventListener('click', () => showScreen(UI.how));
-  $('#settingsBtn').addEventListener('click', () => showScreen(UI.settings));
+  $('#settingsBtn').addEventListener('click', () => { renderRunHistory(); showScreen(UI.settings); });
   $$('[data-back-menu]').forEach((button) => button.addEventListener('click', returnToMenu));
 
   let lastAudioHoverControl = null;
@@ -7865,6 +8150,8 @@
         level: player?.level || 0,
         pendingLevelUps,
         choices: currentUpgradeChoices.map((choice) => ({ id: choice.upgrade.id, rarity: choice.rarityKey })),
+        lockedChoiceIds: [...lockedUpgradeIds],
+        runHistoryCount: loadRunHistory().length,
         runCores,
         bankedCores: saveData.cores,
         payoutPreview: player && !runSettled ? calculateCorePayout(1) : lastCorePayout,
@@ -7953,6 +8240,15 @@
         skipTraining: () => { finishEchoTutorial(true); return !tutorial?.active; },
         activateEcho: () => { if (!player || gameState !== 'playing') return false; player.echoCooldown = 0; activateEcho(); return arrays.echoes.length > 0; },
         status: () => window.echoRiftStatus,
+        lockChoice: (index = 0) => {
+          const choice = currentUpgradeChoices[Math.max(0, Math.floor(Number(index) || 0))];
+          if (choice) toggleUpgradeLock(choice);
+          return [...lockedUpgradeIds];
+        },
+        reroll: () => {
+          rerollUpgradeChoices();
+          return window.echoRiftStatus.choices;
+        },
         audioStatus: () => audio.status(),
         audioTest: async () => {
           const ready = await audio.init();
