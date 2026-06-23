@@ -4606,14 +4606,21 @@
       button.dataset.route = route.id; button.dataset.grade = forecast.grade;
       button.setAttribute('aria-label',`${route.name}, 경로 ${route.risk}, 최종 위험 ${forecast.grade}, 기본 이상 현상 ${forecast.base.name}. ${routeForecastSummary(forecast,8)}. ${route.reward}`);
       const anomalyText = route.forceStable && pendingRouteBaseModifier?.id !== 'stable' ? `${pendingRouteBaseModifier.name} 제거` : forecast.base.name;
+      const meter = clamp(forecast.score / 1.35, 0.08, 1);
       button.innerHTML = `
         <div class="route-card-icon">${uiIcon(routeIconMap[route.id] || 'route')}</div>
-        <div class="route-card-copy"><div class="route-card-top"><span class="route-risk">${escapeHtml(route.risk)}</span><span class="route-final-grade" data-grade="${forecast.grade}">최종 ${forecast.grade}</span></div><h3>${escapeHtml(route.name)}</h3><div class="route-tagline">${escapeHtml(route.tagline)}</div></div>
-        <div class="route-effects">
+        <div class="route-card-main">
+          <div class="route-card-copy">
+            <div class="route-card-top"><span class="route-choice-key">${index+1}</span><span class="route-risk">${escapeHtml(route.risk)}</span><span class="route-final-grade" data-grade="${forecast.grade}">최종 ${forecast.grade}</span></div>
+            <h3>${escapeHtml(route.name)}</h3><div class="route-tagline">${escapeHtml(route.tagline)}</div>
+          </div>
+          <div class="route-card-meter" style="--route-meter:${meter.toFixed(3)}" aria-label="위험 계수 ${Math.round(meter * 100)}%"><i></i></div>
+        </div>
+        <div class="route-effects route-card-facts">
           <div class="route-effect anomaly"><span>기본 이상 현상</span><b>${escapeHtml(anomalyText)}</b></div>
           <div class="route-effect reward"><span>즉시·완료 보상</span><b>${escapeHtml(route.reward.replace('보상 · ',''))}</b></div>
           <div class="route-effect forecast"><span>최종 전투 수치 · 확정</span><b>${escapeHtml(routeForecastSummary(forecast,6))}</b></div>
-        </div><div class="route-number">${index+1}</div>`;
+        </div>`;
       button.addEventListener('pointerenter',()=>setRoutePreview(route,index));
       button.addEventListener('focus',()=>setRoutePreview(route,index));
       button.addEventListener('click',()=>selectRoute(route));
