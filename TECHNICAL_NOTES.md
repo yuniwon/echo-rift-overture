@@ -1,4 +1,56 @@
-# ECHO RIFT: OVERTURE 6.10 — 기술 노트 (HARDENING)
+# ECHO RIFT: OVERTURE 6.11 — 기술 노트 (CONTROL)
+
+## 6.11 목표
+
+플레이어 입력을 직접 통제할 수 있게 하고, 부분 리롤의 경제 영향을 관찰할 수 있는 로컬 계측을 추가합니다. 6.10의 저장 import 하드닝, 서비스워커 요청별 폴백, 행동 기반 QA는 유지합니다. 신규 콘텐츠, 전투 밸런스 조정, 온라인 텔레메트리는 추가하지 않았습니다.
+
+## 컨트롤 바인딩 경계
+
+`js/control-bindings.js`는 키보드 액션 정의, 기본 키맵, `event.code` 토큰 정규화, 표시 라벨을 담당합니다. `index.html`은 이 파일을 `js/game.js`보다 먼저 로드하고, 서비스워커는 `./js/control-bindings.js`를 코어 자산으로 선캐시합니다.
+
+설정의 `keyBindings`는 `defaultSettings`에 포함되며 `normalizeSettingsData()`에서 `normalizeKeyBindingMap()`을 거칩니다. 따라서 저장 가져오기에서 알 수 없는 액션 키나 잘못된 타입은 유지되지 않습니다.
+
+설정 화면의 키보드 입력 섹션은 다음 액션을 재지정합니다.
+
+- 이동 4방향
+- 조준 4방향
+- 사격, 대시, 잔향 호출 2개
+- 선택지 재구성, 일시정지
+
+## 강화 카드 접근성
+
+강화 선택 카드는 더 이상 카드 전체를 `<button>`으로 렌더링하지 않습니다. 카드 컨테이너는 `<article class="upgrade-card">`이고, 선택 버튼(`.upgrade-select`)과 잠금 버튼(`.upgrade-lock`)은 형제 `<button>`입니다. 숫자 단축키는 해당 카드의 `.upgrade-select`를 실행합니다.
+
+## 리롤 경제 계측
+
+`runEconomyStats`는 런 단위로 초기화되며 다음 값만 관찰합니다.
+
+- `rerollsUsed`
+- `averageLockedCards`
+- `maxLockedCards`
+- `lastLockedCards`
+- `postRerollSelections`
+- `synergyMilestones`
+
+`rerollUpgradeChoices()`는 실제로 리롤 자원을 소비한 경우에만 `recordRerollEconomy(locked.length, currentUpgradeChoices.length)`를 호출합니다. 모든 카드가 잠겨 조기 반환되는 경우에는 리롤 횟수와 경제 계측값 모두 변하지 않습니다. `selectUpgrade()`는 리롤 직후 선택 여부와 2/3단계 계열 시너지 도달 시점을 기록합니다.
+
+`window.echoRiftStatus.economy`와 최근 런 기록의 `economy` 필드가 이 요약을 노출합니다. 이 계측은 밸런스 수치, 리롤 비용, 희귀도 확률을 변경하지 않습니다.
+
+## 6.11 행동 검증
+
+`scripts/verify-6.11-control.mjs`는 로컬 정적 서버와 Playwright로 다음을 확인합니다.
+
+- 설정 UI에서 사격 키를 `KeyK`로 리매핑, localStorage 저장, 새로고침 후 유지, 기본값 복구
+- 강화 카드가 `<article>` 컨테이너이며 선택/잠금 버튼이 형제 구조인지 확인
+- 두 장 잠금 후 리롤 경제 계측값 기록 확인
+- 모든 카드 잠금 후 리롤 자원과 경제 계측값 미변경 확인
+- 90초 전투/컨트롤 루프에서 게임 시간이 진행되고 상태 노출이 유지되는지 확인
+
+## 남은 하드웨어 검증
+
+물리 게임패드 리매핑, 조준 감도/데드존/축 반전, 터치 버튼 위치 편집, 저사양 실기기 성능, 오디오 청감 평가는 이 데스크톱 정적 검증 범위에 포함하지 않았습니다.
+
+---
 
 ## 6.10 목표
 
@@ -45,7 +97,7 @@
 
 ## 서비스워커 폴백
 
-`CACHE_NAME`은 `echo-rift-hardening-v6.10.0`입니다. fetch 전략은 요청 종류별로 분리했습니다.
+`CACHE_NAME`은 `echo-rift-control-v6.11.0`입니다. fetch 전략은 요청 종류별로 분리했습니다.
 
 - `request.mode === 'navigate'`: 네트워크 우선, 실패 시에만 캐시된 `index.html` 반환
 - 스크립트·CSS·이미지·manifest 등 에셋: 캐시 우선, 네트워크 실패 시 `Response.error()`

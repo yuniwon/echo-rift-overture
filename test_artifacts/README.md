@@ -1,11 +1,12 @@
 # ECHO RIFT Test Artifacts
 
-This directory stores repeatable quality-loop evidence for `ECHO RIFT: OVERTURE 6.9 — INTENT`.
+This directory stores repeatable quality-loop evidence for `ECHO RIFT: OVERTURE`.
 
 Current contents:
 
 - `iteration-00-metrics.json` — prompt-intake baseline command results and known missing evidence.
 - `iteration-01-metrics.json` — 6.10 hardening behavior-test results and remaining evidence gaps.
+- `iteration-02-metrics.json` — 6.11 control remapping, upgrade-card accessibility, reroll economy, and 90-second browser-loop results.
 
 Expected future artifact naming:
 

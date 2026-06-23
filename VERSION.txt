@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 6.10.0
-Codename: HARDENING
+Version 6.11.0
+Codename: CONTROL
 Build date: 2026-06-24
-Focus: behavior-proven hardening. Browser-driven regression tests now exercise card locking, partial reroll, save import/undo, boss intro protection, and route forecast consistency; import commits are stricter and rollback-capable; service-worker fallback is request-type aware; browser zoom is allowed outside the canvas/touch action locks.
+Focus: player control and instrumentation. Keyboard actions can be remapped in settings, upgrade card select/lock controls are no longer nested, partial-reroll economy signals are recorded locally, and a 90-second Playwright control/combat probe verifies the long-running behavior path alongside the 6.10 hardening checks.

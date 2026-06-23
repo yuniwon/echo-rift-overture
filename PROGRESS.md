@@ -99,3 +99,53 @@ The next quality bottleneck is not more content. The build needs browser-driven 
 - 90-second combat metric loop for reroll economy and echo contribution
 - `game.js` module split
 - Physical gamepad, audio listening, low-end mobile validation
+
+## Iteration 2 — CONTROL Input and Economy Proof
+
+Date: 2026-06-24
+
+Build: `ECHO RIFT: OVERTURE 6.11 — CONTROL`
+
+Decision: keep. Runtime changes are limited to keyboard remapping, upgrade-card accessibility structure, local reroll economy instrumentation, and behavior verification. No combat balance or content tuning is included.
+
+### Hypothesis
+
+The remaining P0 risk is that player control and partial-reroll economy changes are not proven through behavior. A focused control pass should make keyboard actions reassignable, remove nested card controls, and expose enough local economy data to tune later from evidence.
+
+### Files Changed
+
+- `js/control-bindings.js`
+- `js/game.js`
+- `index.html`
+- `css/style.css`
+- `sw.js`
+- `scripts/verify-6.9.mjs`
+- `scripts/verify-6.11-control.mjs`
+- release docs and `CHECKSUMS.sha256`
+
+### Checks
+
+| Check | Result | Evidence |
+|---|---|---|
+| `node --check js/control-bindings.js` | PASS | exit code 0, no output |
+| `node --check js/game.js` | PASS | exit code 0, no output |
+| `node --check sw.js` | PASS | exit code 0, no output |
+| `node --check scripts/verify-6.11-control.mjs` | PASS | exit code 0, no output |
+| `node scripts/verify-6.11-control.mjs` | PASS | `verify-6.11-control passed` |
+
+### Before / After
+
+| Area | Before | After |
+|---|---|---|
+| Keyboard controls | Gameplay keys were hardcoded in `InputManager` | Settings can remap movement, aim, fire, dash, echo, reroll, and pause; defaults can be restored |
+| Upgrade card accessibility | Lock control was nested inside an interactive card button | Card is an `article`; select and lock are sibling buttons |
+| Reroll economy | Partial reroll changed choice economy without local usage signals | Runtime records rerolls used, average/max locked cards, post-reroll selections, and synergy milestones |
+| Long-run behavior proof | No 90-second control/combat verifier | `verify-6.11-control` drives remapping, reroll metrics, card structure, and a 90-second browser loop |
+
+### Remaining Deferred Items
+
+- Physical gamepad remapping and aim sensitivity/deadzone/axis inversion
+- Touch button size/position editing
+- Low-end mobile and physical gamepad validation
+- Audio listening validation
+- Broad `game.js` module split beyond the new control binding boundary

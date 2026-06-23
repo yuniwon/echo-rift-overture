@@ -1,0 +1,65 @@
+{
+  "iteration": "2",
+  "type": "control_input_and_economy_proof",
+  "timestamp": "2026-06-24T00:00:00+09:00",
+  "build": {
+    "name": "ECHO RIFT: OVERTURE",
+    "version": "6.11.0",
+    "codename": "CONTROL"
+  },
+  "runtimeChanges": [
+    "keyboard remapping settings",
+    "control binding helper boundary",
+    "upgrade card select and lock sibling buttons",
+    "partial reroll economy instrumentation",
+    "90-second Playwright control and combat probe"
+  ],
+  "checks": [
+    {
+      "command": "node --check js/control-bindings.js",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node --check js/game.js",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node --check sw.js",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node --check scripts/verify-6.11-control.mjs",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "node scripts/verify-6.11-control.mjs",
+      "exitCode": 0,
+      "stdout": "verify-6.11-control passed",
+      "stderr": ""
+    }
+  ],
+  "behaviorCoverage": {
+    "settingsKeyRemap": "passed",
+    "settingsKeyRemapReloadPersistence": "passed",
+    "settingsKeyReset": "passed",
+    "upgradeCardSiblingControls": "passed",
+    "partialRerollEconomyMetrics": "passed",
+    "allLockedRerollNoEconomySpend": "passed",
+    "ninetySecondControlCombatLoop": "passed"
+  },
+  "remainingEvidence": {
+    "requiredViewportScreenshots": "not_run",
+    "firstTenMinuteCapture": "not_run",
+    "audioListening": "requires_human_validation",
+    "physicalGamepad": "requires_hardware_validation",
+    "lowEndMobile": "requires_hardware_validation"
+  }
+}

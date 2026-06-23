@@ -1,21 +1,32 @@
-# ECHO RIFT: OVERTURE 6.10 — QA 보고서 (HARDENING)
+# ECHO RIFT: OVERTURE 6.11 — QA 보고서 (CONTROL)
 
-검증일: 2026-06-23
+검증일: 2026-06-24
 
 ## 환경 한계
 
-이번 패치는 정적 파일 기반 브라우저 게임의 하드닝을 수행했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-6.9.mjs`의 구조 검사, `scripts/verify-6.10-hardening.mjs`의 Playwright 행동 검사를 수행했습니다. 실제 플레이 뷰포트 캡처, 모바일 터치 실기기, 물리 게임패드, 장시간 성능 검사는 별도 수동 확인이 필요합니다.
+이번 패치는 정적 파일 기반 브라우저 게임의 입력 통제와 리롤 계측을 보강했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-6.9.mjs`의 구조 검사, `scripts/verify-6.10-hardening.mjs`의 기존 행동 검사, `scripts/verify-6.11-control.mjs`의 컨트롤/경제 행동 검사를 수행했습니다. 실제 모바일 터치 실기기, 물리 게임패드, 오디오 청감, 저사양 장시간 성능 검사는 별도 수동 확인이 필요합니다.
 
 ## 실행한 자동 검사
 
 | 검사 | 목적 |
 |---|---|
 | `node --check js/game.js` | 브라우저 런타임 스크립트 구문 검사 |
+| `node --check js/control-bindings.js` | 키보드 바인딩 헬퍼 구문 검사 |
 | `node --check sw.js` | 서비스워커 구문 검사 |
 | `node scripts/verify-6.9.mjs` | 6.9 기능 연결, HTML ID 중복, manifest 파싱, 현재 릴리스 문자열 검사 |
 | `node scripts/verify-6.10-hardening.mjs` | 부분 리롤, import/undo, import 거부, 보스 인트로, 경로 예고 일치의 실제 브라우저 행동 검사 |
+| `node scripts/verify-6.11-control.mjs` | 설정 리매핑, 강화 카드 구조, 리롤 경제 계측, 90초 전투 루프 행동 검사 |
 | Playwright 브라우저 스모크 | 1366×768 로드, 설정 화면 진입, 데이터 UI ID, QA 훅, 콘솔/페이지 오류 확인 |
 | Git for Windows `sha256sum.exe -c CHECKSUMS.sha256` | 배포 파일 체크섬 검증 |
+
+## `verify-6.11-control` 검사 범위
+
+- 설정 화면에서 사격 키를 `KeyK`로 리매핑하고 localStorage 저장 확인
+- 새로고침 후 리매핑 유지와 기본값 복구 확인
+- 강화 카드가 `<article>` 컨테이너이며 선택/잠금 컨트롤이 형제 `<button>`인지 확인
+- 카드 두 장 잠금 후 리롤 경제 계측값 기록 확인
+- 모든 카드 잠금 후 리롤 자원과 경제 계측값 미변경 확인
+- 90초 전투 루프에서 게임 시간 진행, 생존 상태, 잔향 사용/피해 상태, 경제 상태 노출 확인
 
 ## `verify-6.10-hardening` 검사 범위
 
@@ -38,16 +49,17 @@
 - export/import 함수 내부의 `fetch`/`sendBeacon`/`eval`/`new Function` 미사용
 - 데이터 설정 UI ID 연결
 - 런 기록 상수, 로드/검증/추가/렌더링 헬퍼, 20개 상한, 중복 기록 방지 플래그
-- HTML ID 중복 없음, manifest JSON 파싱, 현재 HARDENING 릴리스 문자열
+- HTML ID 중복 없음, manifest JSON 파싱, 현재 CONTROL 릴리스 문자열
 
 ## 브라우저 스모크 확인 범위
 
 - `index.html?qa=1` 로드 성공
-- 문서 제목과 edition badge가 HARDENING 릴리스로 표시
+- 문서 제목과 edition badge가 CONTROL 릴리스로 표시
 - 설정 화면 진입 성공
-- `includeSettingsExport`, `exportSaveBtn`, `importSaveInput`, `runHistoryList`, `clearRunHistoryBtn` 존재
+- `includeSettingsExport`, `exportSaveBtn`, `importSaveInput`, `runHistoryList`, `clearRunHistoryBtn`, `keybindGrid`, `resetKeyBindingsBtn` 존재
 - `window.__echoRiftQA` 활성화
 - `window.echoRiftStatus.runHistoryCount` 노출
+- `window.echoRiftStatus.keyBindings`와 `window.echoRiftStatus.economy` 노출
 - 확인 범위의 page error 0, console error 0
 
 ## 회귀 잠금 점검
@@ -55,7 +67,8 @@
 | 회귀 잠금 | 영향 |
 |---|---|
 | 잔향 스냅숏·미리보기 일치 | 미변경 |
-| 위상 균열 수치·출처 | 읽기/요약만 추가, 전투 계산 미변경 |
+| 위상 균열 수치·출처 | 미변경 |
+| 부분 리롤 경제 | 계측만 추가, 카드 생성·리롤 비용 미변경 |
 | 경로 예측 = 실제 웨이브 | 미변경 |
 | 기본·고급 튜토리얼 분리 | 미변경 |
 | 보스 인트로 피해/시뮬레이션 정지 | 미변경 |
@@ -66,11 +79,13 @@
 
 ## 수동 확인 필요
 
+- 물리 게임패드 리매핑, 조준 감도/데드존/축 반전 설계와 실기기 검증
+- 터치 버튼 크기·위치 편집 UI와 실기기 검증
 - 강화 화면에서 실제 키보드/마우스/터치/게임패드 포커스로 잠금 토글과 부분 리롤 체감 확인
 - 새 브라우저 프로필에서 정상 export/import 왕복과 reload 후 설정 재적용 확인
 - 손상 파일, 미래 schema, 1MB 초과 파일의 사용자 메시지 문구 확인
 - 설정 화면 데이터 그룹과 런 기록 목록의 2560×1440 / 1920×1080 / 1366×768 / 390×844 / 360×640 / 320×568 / 667×375 뷰포트 확인
-- 장시간 플레이에서 런 기록이 결과 수치와 일치하는지 확인
+- 장시간 플레이에서 런 기록과 리롤 경제 요약이 결과 수치와 일치하는지 확인
 
 ## 비목표
 

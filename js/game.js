@@ -107,7 +107,7 @@
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '6.10.0';
+  const GAME_VERSION = '6.11.0';
   const MAX_ENEMY_BULLETS = 680;
   const MAX_PLAYER_BULLETS = 360;
   const WORLD_UNITS_PER_METER = 10;
@@ -167,6 +167,42 @@
   // ---------------------------------------------------------------------------
   // Persistence & settings
   // ---------------------------------------------------------------------------
+  const controlBindings = window.EchoRiftControlBindings;
+  const fallbackKeyBindings = {
+    moveUp: 'KeyW',
+    moveDown: 'KeyS',
+    moveLeft: 'KeyA',
+    moveRight: 'KeyD',
+    aimUp: 'ArrowUp',
+    aimDown: 'ArrowDown',
+    aimLeft: 'ArrowLeft',
+    aimRight: 'ArrowRight',
+    fire: 'KeyJ',
+    dash: 'Space',
+    echoPrimary: 'KeyE',
+    echoSecondary: 'KeyQ',
+    reroll: 'KeyR',
+    pause: 'Escape',
+  };
+  function defaultKeyBindingMap() {
+    return controlBindings?.defaultKeyBindings?.() || { ...fallbackKeyBindings };
+  }
+  function normalizeKeyBindingMap(raw) {
+    return controlBindings?.normalizeKeyBindingMap?.(raw) || { ...fallbackKeyBindings };
+  }
+  function keyBindingActionDefinitions() {
+    return controlBindings?.actionDefinitions?.() || Object.keys(fallbackKeyBindings).map((id) => ({ id, label: id, group: '입력' }));
+  }
+  function eventKeyToken(event) {
+    return controlBindings?.eventToken?.(event) || String(event?.key || '').toLowerCase();
+  }
+  function keyBindingLabel(token) {
+    return controlBindings?.keyLabel?.(token) || String(token || '').toUpperCase();
+  }
+  function keyMatchesAction(actionId, token) {
+    return controlBindings?.matchesAction?.(settings.keyBindings, actionId, token) || normalizeKeyBindingMap(settings.keyBindings)[actionId] === token;
+  }
+
   const defaultSettings = {
     master: 0.78,
     music: true,
@@ -193,6 +229,7 @@
     flashIntensity: 0.72,
     combatPalette: 'default',
     projectileShapes: true,
+    keyBindings: defaultKeyBindingMap(),
   };
   const SETTING_ENUMS = {
     graphicsMode: ['auto', 'high', 'balanced', 'performance'],
@@ -267,7 +304,9 @@
     const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
     const normalized = {};
     for (const [key, fallback] of Object.entries(defaultSettings)) {
-      if (hasOwnValue(SETTING_NUMBER_RANGES, key)) {
+      if (key === 'keyBindings') {
+        normalized[key] = normalizeKeyBindingMap(source[key]);
+      } else if (hasOwnValue(SETTING_NUMBER_RANGES, key)) {
         const [min, max, integer = false] = SETTING_NUMBER_RANGES[key];
         normalized[key] = settingNumber(source[key], fallback, min, max, integer);
       } else if (hasOwnValue(SETTING_ENUMS, key)) {
@@ -598,6 +637,23 @@
     }
   }
 
+  function normalizeRunEconomy(raw) {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    const milestones = Array.isArray(source.synergyMilestones) ? source.synergyMilestones.slice(0, 8).map((item) => ({
+      family: String(item?.family || ''),
+      rank: clamp(Math.floor(Number(item?.rank) || 0), 0, 3),
+      level: Math.max(1, Math.floor(Number(item?.level) || 1)),
+      timeSeconds: Math.max(0, Number(item?.timeSeconds) || 0),
+    })).filter((item) => item.family && item.rank > 0) : [];
+    return {
+      rerollsUsed: Math.max(0, Math.floor(Number(source.rerollsUsed) || 0)),
+      averageLockedCards: Number(clamp(Number(source.averageLockedCards) || 0, 0, 6).toFixed(2)),
+      maxLockedCards: Math.max(0, Math.floor(Number(source.maxLockedCards) || 0)),
+      postRerollSelections: Math.max(0, Math.floor(Number(source.postRerollSelections) || 0)),
+      synergyMilestones: milestones,
+    };
+  }
+
   function normalizeRunHistoryEntry(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const outcome = raw.outcome === 'win' ? 'win' : raw.outcome === 'death' ? 'death' : null;
@@ -624,6 +680,7 @@
         procs: Math.max(0, Math.floor(Number(phase.procs) || 0)),
         bonusDamage: Math.max(0, Math.round(Number(phase.bonusDamage) || 0)),
       },
+      economy: normalizeRunEconomy(raw.economy),
       seed: raw.seed == null ? undefined : String(raw.seed),
     };
   }
@@ -658,6 +715,7 @@
         procs: phaseRiftProcs,
         bonusDamage: Math.round(phaseRiftBonusDamage),
       },
+      economy: getRunEconomySummary(),
       seed: runSeed ? String(runSeed) : undefined,
     };
   }
@@ -675,10 +733,12 @@
       const dateLabel = Number.isNaN(date.getTime()) ? '시간 미상' : date.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const buildText = run.build.length ? run.build.map((item) => `${escapeHtml(item.label)} ${item.rank}`).join(' · ') : '빌드 미확립';
       const outcome = run.outcome === 'win' ? '승리' : '붕괴';
+      const economy = run.economy || normalizeRunEconomy(null);
+      const rerollText = economy.rerollsUsed > 0 ? ` · 리롤 ${economy.rerollsUsed}회 / 평균 잠금 ${economy.averageLockedCards.toFixed(1)}장` : '';
       return `<article class="run-history-item">
         <header><b>#${index + 1} ${outcome}</b><span>${dateLabel}</span></header>
         <p>점수 ${formatNumber(run.score)} · SECTOR ${String(run.sector).padStart(2, '0')} · ${formatTime(run.timeSeconds)} · L${run.level} · 처치 ${formatNumber(run.kills)}</p>
-        <p>${buildText} · 잔향 ${run.echoShare.toFixed(run.echoShare >= 10 ? 0 : 1)}% · 균열 ${run.phaseRift.procs}회 / +${formatNumber(run.phaseRift.bonusDamage)}</p>
+        <p>${buildText} · 잔향 ${run.echoShare.toFixed(run.echoShare >= 10 ? 0 : 1)}% · 균열 ${run.phaseRift.procs}회 / +${formatNumber(run.phaseRift.bonusDamage)}${rerollText}</p>
       </article>`;
     }).join('');
   }
@@ -698,6 +758,87 @@
     saveRunHistory([]);
     renderRunHistory();
     showToast('최근 런 기록을 초기화했습니다', 1700);
+  }
+
+  let pendingKeyBindAction = null;
+
+  function getKeyBindingStatus() {
+    const bindings = normalizeKeyBindingMap(settings.keyBindings);
+    return Object.fromEntries(keyBindingActionDefinitions().map((action) => {
+      const token = bindings[action.id];
+      return [action.id, {
+        label: action.label,
+        group: action.group,
+        token,
+        display: keyBindingLabel(token),
+      }];
+    }));
+  }
+
+  function renderKeyBindings() {
+    const grid = $('#keybindGrid');
+    if (!grid) return;
+    const bindings = normalizeKeyBindingMap(settings.keyBindings);
+    grid.innerHTML = '';
+    let activeGroup = '';
+    for (const action of keyBindingActionDefinitions()) {
+      if (action.group !== activeGroup) {
+        activeGroup = action.group;
+        const heading = document.createElement('div');
+        heading.className = 'keybind-group-label';
+        heading.textContent = activeGroup;
+        grid.appendChild(heading);
+      }
+      const row = document.createElement('div');
+      row.className = 'keybind-row';
+      const label = document.createElement('span');
+      label.className = 'keybind-label';
+      label.textContent = action.label;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'keybind-btn';
+      button.dataset.keybindAction = action.id;
+      button.setAttribute('aria-pressed', String(pendingKeyBindAction === action.id));
+      button.textContent = pendingKeyBindAction === action.id ? '입력 대기' : keyBindingLabel(bindings[action.id]);
+      row.append(label, button);
+      grid.appendChild(row);
+    }
+    const status = $('#keybindStatus');
+    if (status) status.textContent = pendingKeyBindAction
+      ? '변경할 키를 누르세요. 같은 키를 여러 행동에 배정하면 동시에 작동합니다.'
+      : '버튼을 선택한 뒤 새 키를 누르면 즉시 저장됩니다.';
+  }
+
+  function beginKeyRebind(actionId) {
+    const action = keyBindingActionDefinitions().find((item) => item.id === actionId);
+    if (!action) return;
+    pendingKeyBindAction = action.id;
+    renderKeyBindings();
+  }
+
+  function capturePendingKeyBinding(event) {
+    if (!pendingKeyBindAction) return false;
+    const token = eventKeyToken(event);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!token) return true;
+    const bindings = normalizeKeyBindingMap(settings.keyBindings);
+    bindings[pendingKeyBindAction] = token;
+    settings.keyBindings = normalizeKeyBindingMap(bindings);
+    const action = keyBindingActionDefinitions().find((item) => item.id === pendingKeyBindAction);
+    pendingKeyBindAction = null;
+    saveJSON(SETTINGS_KEY, settings);
+    applySettings();
+    showToast(`${action?.label || '입력'} · ${keyBindingLabel(token)}`, 1300);
+    return true;
+  }
+
+  function resetKeyBindings() {
+    pendingKeyBindAction = null;
+    settings.keyBindings = defaultKeyBindingMap();
+    saveJSON(SETTINGS_KEY, settings);
+    applySettings();
+    showToast('키보드 입력을 기본값으로 되돌렸습니다', 1500);
   }
 
   function applySettings() {
@@ -720,6 +861,7 @@
     settings.rarityPatterns = settings.rarityPatterns !== false;
     settings.echoTrail = settings.echoTrail !== false;
     settings.offscreenWarnings = settings.offscreenWarnings !== false;
+    settings.keyBindings = normalizeKeyBindingMap(settings.keyBindings);
 
     document.documentElement.style.setProperty('--text-scale', settings.uiScale.toFixed(2));
     document.documentElement.style.setProperty('--flash-opacity', settings.flashIntensity.toFixed(2));
@@ -766,6 +908,7 @@
     UI.perfHud.classList.toggle('hidden', !settings.showPerf);
     audio.applyVolume();
     updateTouchControlsVisibility();
+    renderKeyBindings();
   }
 
   const QUALITY_LABELS = ['성능 우선', '균형', '고화질'];
@@ -1535,20 +1678,23 @@
 
     bind() {
       window.addEventListener('keydown', (event) => {
+        if (capturePendingKeyBinding(event)) return;
         const key = event.key.toLowerCase();
-        const echoKey = key === 'e' || key === 'q';
-        if (!this.keys.has(key)) {
+        const token = eventKeyToken(event);
+        const echoKey = keyMatchesAction('echoPrimary', token) || keyMatchesAction('echoSecondary', token);
+        if (!this.keys.has(token)) {
           if (echoKey) {
-            this.echoKeyboardKeys.add(key);
+            this.echoKeyboardKeys.add(token);
             if (this.echoKeyboardKeys.size === 1) this.beginEcho('keyboard');
-          } else this.justPressed.add(key);
+          } else this.justPressed.add(token);
         }
-        this.keys.add(key);
+        this.keys.add(token);
         this.setLastDevice('keyboard');
         if (gameState === 'playing' || gameState === 'paused' || gameState === 'upgrade' || gameState === 'route') {
-          if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'tab'].includes(key)) event.preventDefault();
+          const mappedAction = ['moveUp', 'moveDown', 'moveLeft', 'moveRight', 'aimUp', 'aimDown', 'aimLeft', 'aimRight', 'fire', 'dash', 'echoPrimary', 'echoSecondary', 'reroll', 'pause'].some((action) => keyMatchesAction(action, token));
+          if (mappedAction || ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(token)) event.preventDefault();
         }
-        if (key === 'escape') {
+        if (keyMatchesAction('pause', token)) {
           if (gameState === 'playing' && this.cancelEcho('escape', false)) {
             showToast('잔향 잠금 취소 · 쿨다운은 소비되지 않았습니다', 1500);
             event.preventDefault();
@@ -1558,10 +1704,10 @@
           else if (gameState === 'paused') resumeGame();
         }
         if (gameState === 'upgrade' && ['1', '2', '3', '4', '5', '6'].includes(key)) {
-          const button = UI.upgradeChoices.children[Number(key) - 1];
+          const button = UI.upgradeChoices.children[Number(key) - 1]?.querySelector?.('.upgrade-select') || UI.upgradeChoices.children[Number(key) - 1];
           if (button) button.click();
         }
-        if (gameState === 'upgrade' && key === 'r') rerollUpgradeChoices();
+        if (gameState === 'upgrade' && keyMatchesAction('reroll', token)) rerollUpgradeChoices();
         if (gameState === 'route' && ['1', '2', '3'].includes(key)) {
           const button = UI.routeChoices.children[Number(key) - 1];
           if (button) button.click();
@@ -1569,10 +1715,10 @@
       });
 
       window.addEventListener('keyup', (event) => {
-        const key = event.key.toLowerCase();
-        this.keys.delete(key);
-        if (key === 'e' || key === 'q') {
-          this.echoKeyboardKeys.delete(key);
+        const token = eventKeyToken(event);
+        this.keys.delete(token);
+        if (keyMatchesAction('echoPrimary', token) || keyMatchesAction('echoSecondary', token)) {
+          this.echoKeyboardKeys.delete(token);
           if (this.echoKeyboardKeys.size === 0) this.endEcho('keyboard');
         }
       });
@@ -1836,13 +1982,25 @@
       this.previousButtons = pressed;
     }
 
+    actionDown(actionId) {
+      return this.keys.has(normalizeKeyBindingMap(settings.keyBindings)[actionId]);
+    }
+
+    actionJustPressed(actionId) {
+      return this.justPressed.has(normalizeKeyBindingMap(settings.keyBindings)[actionId]);
+    }
+
+    clearActionPress(actionId) {
+      this.justPressed.delete(normalizeKeyBindingMap(settings.keyBindings)[actionId]);
+    }
+
     getMove() {
       let x = 0;
       let y = 0;
-      if (this.keys.has('a')) x -= 1;
-      if (this.keys.has('d')) x += 1;
-      if (this.keys.has('w')) y -= 1;
-      if (this.keys.has('s')) y += 1;
+      if (this.actionDown('moveLeft')) x -= 1;
+      if (this.actionDown('moveRight')) x += 1;
+      if (this.actionDown('moveUp')) y -= 1;
+      if (this.actionDown('moveDown')) y += 1;
       x += this.touchMove.x + this.gamepad.moveX;
       y += this.touchMove.y + this.gamepad.moveY;
       const mag = Math.hypot(x, y);
@@ -1854,8 +2012,8 @@
       let x = 0;
       let y = 0;
       let active = false;
-      const keyX = (this.keys.has('arrowright') ? 1 : 0) - (this.keys.has('arrowleft') ? 1 : 0);
-      const keyY = (this.keys.has('arrowdown') ? 1 : 0) - (this.keys.has('arrowup') ? 1 : 0);
+      const keyX = (this.actionDown('aimRight') ? 1 : 0) - (this.actionDown('aimLeft') ? 1 : 0);
+      const keyY = (this.actionDown('aimDown') ? 1 : 0) - (this.actionDown('aimUp') ? 1 : 0);
       if (keyX || keyY) {
         x = keyX; y = keyY; active = true;
       } else if (this.touchAim.active) {
@@ -1876,15 +2034,16 @@
     }
 
     isFiring(aimActive) {
-      return this.pointer.down || this.touchFire || this.gamepad.fire || this.keys.has('j') || (settings.autoFire && aimActive);
+      return this.pointer.down || this.touchFire || this.gamepad.fire || this.actionDown('fire') || (settings.autoFire && aimActive);
     }
 
     consumeDash() {
-      const keyDash = this.justPressed.has(' ') || this.justPressed.has('shift');
+      const keyDash = this.actionJustPressed('dash') || this.justPressed.has('ShiftLeft') || this.justPressed.has('ShiftRight');
       const result = keyDash || this.actions.dash;
       this.actions.dash = false;
-      this.justPressed.delete(' ');
-      this.justPressed.delete('shift');
+      this.clearActionPress('dash');
+      this.justPressed.delete('ShiftLeft');
+      this.justPressed.delete('ShiftRight');
       if (result && this.cancelEcho('dash', false)) showToast('잔향 잠금 취소 · 대시 우선', 1050);
       return result;
     }
@@ -1897,8 +2056,8 @@
         if (samples) request = { samples, device: this.lastDevice, lockedAt: performance.now(), mode: 'legacy' };
       }
       this.actions.echo = false;
-      this.justPressed.delete('e');
-      this.justPressed.delete('q');
+      this.clearActionPress('echoPrimary');
+      this.clearActionPress('echoSecondary');
       return request;
     }
 
@@ -2041,6 +2200,7 @@
   let pendingLevelUps = 0;
   let currentUpgradeChoices = [];
   const lockedUpgradeIds = new Set();
+  let runEconomyStats = createRunEconomyStats();
   let activeDraftGuarantee = null;
   let activeDraftChoiceBonus = 0;
   let currentRoute = null;
@@ -2067,6 +2227,69 @@
   let quality = configuredQualityTier();
   let perfAccumulator = 0;
   let perfFrames = 0;
+
+  function createRunEconomyStats() {
+    return {
+      rerollsUsed: 0,
+      lockedCardsTotal: 0,
+      maxLockedCards: 0,
+      lastLockedCards: 0,
+      postRerollSelections: 0,
+      pendingPostRerollSelection: false,
+      synergyMilestones: [],
+    };
+  }
+
+  function getRunEconomyStatus() {
+    const rerollsUsed = Math.max(0, Math.floor(runEconomyStats.rerollsUsed || 0));
+    const averageLockedCards = rerollsUsed > 0 ? runEconomyStats.lockedCardsTotal / rerollsUsed : 0;
+    return {
+      rerollsUsed,
+      averageLockedCards: Number(averageLockedCards.toFixed(2)),
+      maxLockedCards: Math.max(0, Math.floor(runEconomyStats.maxLockedCards || 0)),
+      lastLockedCards: Math.max(0, Math.floor(runEconomyStats.lastLockedCards || 0)),
+      postRerollSelections: Math.max(0, Math.floor(runEconomyStats.postRerollSelections || 0)),
+      synergyMilestones: runEconomyStats.synergyMilestones.map((item) => ({ ...item })),
+    };
+  }
+
+  function getRunEconomySummary() {
+    const status = getRunEconomyStatus();
+    return {
+      rerollsUsed: status.rerollsUsed,
+      averageLockedCards: status.averageLockedCards,
+      maxLockedCards: status.maxLockedCards,
+      postRerollSelections: status.postRerollSelections,
+      synergyMilestones: status.synergyMilestones.slice(0, 6),
+    };
+  }
+
+  function recordRerollEconomy(lockedCount, totalChoices) {
+    const locked = clamp(Math.floor(Number(lockedCount) || 0), 0, Math.max(0, Math.floor(Number(totalChoices) || 0)));
+    runEconomyStats.rerollsUsed += 1;
+    runEconomyStats.lockedCardsTotal += locked;
+    runEconomyStats.maxLockedCards = Math.max(runEconomyStats.maxLockedCards, locked);
+    runEconomyStats.lastLockedCards = locked;
+    runEconomyStats.pendingPostRerollSelection = true;
+  }
+
+  function recordUpgradeEconomySelection(family, rank) {
+    if (runEconomyStats.pendingPostRerollSelection) {
+      runEconomyStats.postRerollSelections += 1;
+      runEconomyStats.pendingPostRerollSelection = false;
+    }
+    const milestone = rank >= 3 ? 3 : rank >= 2 ? 2 : 0;
+    if (!milestone || !family) return;
+    const exists = runEconomyStats.synergyMilestones.some((item) => item.family === family && item.rank === milestone);
+    if (!exists) {
+      runEconomyStats.synergyMilestones.push({
+        family,
+        rank: milestone,
+        level: player?.level || 1,
+        timeSeconds: Number(gameTime.toFixed(2)),
+      });
+    }
+  }
   let lowFpsDuration = 0;
   let measuredFps = 60;
   let hudAccumulator = 0;
@@ -3976,15 +4199,14 @@
       const path = evolutionPathFor(upgrade);
       const rarityBonus = Math.round((quality.power - 1) * 100);
       const locked = isChoiceLocked(choice);
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `upgrade-card${synergy ? ' synergy' : ''}${upgrade.evolution ? ' evolution' : ''}${locked ? ' locked' : ''}`;
-      button.dataset.rarity = rarityKey;
-      button.dataset.family = upgrade.family;
-      button.style.setProperty('--rarity-color', quality.color);
-      button.style.setProperty('--family-color', family.color);
-      button.setAttribute('aria-label', `${upgrade.name}, ${quality.label.split(' · ')[1]}, ${description.key}, 선택 시 ${rank + 1}단계`);
-      button.innerHTML = `
+      const card = document.createElement('article');
+      card.className = `upgrade-card${synergy ? ' synergy' : ''}${upgrade.evolution ? ' evolution' : ''}${locked ? ' locked' : ''}`;
+      card.dataset.rarity = rarityKey;
+      card.dataset.family = upgrade.family;
+      card.style.setProperty('--rarity-color', quality.color);
+      card.style.setProperty('--family-color', family.color);
+      card.setAttribute('aria-label', `${upgrade.name}, ${quality.label.split(' · ')[1]}, ${description.key}`);
+      card.innerHTML = `
         <div class="upgrade-rarity-row"><div class="upgrade-rarity">${quality.label.split(' · ')[1]} · ${rarityBonus ? `효과 +${rarityBonus}%` : '기본 효과'}</div><div class="upgrade-family">${family.label} 계열</div></div>
         <div class="upgrade-card-head">
           <div class="upgrade-icon-frame">${uiIcon(family.icon)}</div>
@@ -3998,12 +4220,14 @@
           <div><span>선택 결과</span><b>${rank}단계 → ${rank + 1}단계</b></div>
         </div>
         ${path ? `<div class="upgrade-path${path.ready ? ' ready' : ''}">${path.html}</div>` : ''}
-        <div class="upgrade-card-footer"><div><div class="upgrade-power">${family.role} · ${rarityBonus ? `+${rarityBonus}% 증폭` : '표준 출력'}</div><div class="upgrade-level">현재 ${rank} / 최대 ${upgrade.max}</div></div><div class="upgrade-hotkey">${index + 1}</div></div>
+        <div class="upgrade-card-footer"><div><div class="upgrade-power">${family.role} · ${rarityBonus ? `+${rarityBonus}% 증폭` : '표준 출력'}</div><div class="upgrade-level">현재 ${rank} / 최대 ${upgrade.max}</div></div><button type="button" class="upgrade-select"><span>선택</span><kbd>${index + 1}</kbd></button></div>
       `;
-      const lock = document.createElement('span');
+      const selectButton = card.querySelector('.upgrade-select');
+      selectButton.setAttribute('aria-label', `${upgrade.name}, ${quality.label.split(' · ')[1]}, ${description.key}, 선택 시 ${rank + 1}단계`);
+      selectButton.addEventListener('click', () => selectUpgrade(choice));
+      const lock = document.createElement('button');
+      lock.type = 'button';
       lock.className = 'upgrade-lock';
-      lock.setAttribute('role', 'button');
-      lock.tabIndex = 0;
       lock.setAttribute('aria-pressed', String(locked));
       lock.setAttribute('aria-label', `${upgrade.name} ${locked ? '잠금 해제' : '잠금'}`);
       lock.innerHTML = `${uiIcon('lock')}<span>${locked ? '고정' : '잠금'}</span>`;
@@ -4012,15 +4236,8 @@
         event.stopPropagation();
         toggleUpgradeLock(choice);
       });
-      lock.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        event.stopPropagation();
-        toggleUpgradeLock(choice);
-      });
-      button.appendChild(lock);
-      button.addEventListener('click', () => selectUpgrade(choice));
-      UI.upgradeChoices.appendChild(button);
+      card.appendChild(lock);
+      UI.upgradeChoices.appendChild(card);
     });
     if (playRevealSound) audio.draftReveal(rarityIndex(bestRarity));
   }
@@ -4052,6 +4269,7 @@
     const { upgrade, quality, rarityKey } = choice;
     player.upgradeLevels[upgrade.id] = (player.upgradeLevels[upgrade.id] || 0) + 1;
     player.familyRanks[upgrade.family] = (player.familyRanks[upgrade.family] || 0) + (upgrade.evolution ? 3 : 1);
+    recordUpgradeEconomySelection(upgrade.family, player.familyRanks[upgrade.family]);
     player.level++;
     player.upgradesChosen++;
     lockedUpgradeIds.clear();
@@ -4085,6 +4303,7 @@
     const needed = currentUpgradeChoices.length - locked.length;
     const replacements = createUpgradeChoices(needed, true, { excludeIds });
     player.rerolls--;
+    recordRerollEconomy(locked.length, currentUpgradeChoices.length);
     const nextChoices = currentUpgradeChoices.map((choice) => isChoiceLocked(choice) ? choice : replacements.shift()).filter(Boolean);
     currentUpgradeChoices = nextChoices;
     renderUpgradeChoices(currentUpgradeChoices, false);
@@ -4589,6 +4808,7 @@
     endlessMode = false;
     pendingLevelUps = 0;
     currentUpgradeChoices = [];
+    runEconomyStats = createRunEconomyStats();
     activeDraftGuarantee = null;
     activeDraftChoiceBonus = 0;
     currentRoute = null;
@@ -8082,6 +8302,11 @@
   });
   $('#restoreImportBackupBtn')?.addEventListener('click', restoreImportBackup);
   $('#clearRunHistoryBtn')?.addEventListener('click', clearRunHistory);
+  $('#keybindGrid')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-keybind-action]');
+    if (button) beginKeyRebind(button.dataset.keybindAction);
+  });
+  $('#resetKeyBindingsBtn')?.addEventListener('click', resetKeyBindings);
   $('#howBtn').addEventListener('click', () => showScreen(UI.how));
   $('#settingsBtn').addEventListener('click', () => { renderRunHistory(); updateImportBackupStatus(); showScreen(UI.settings); });
   $$('[data-back-menu]').forEach((button) => button.addEventListener('click', returnToMenu));
@@ -8106,7 +8331,7 @@
     const control = event.target.closest('button:not(:disabled), select, input[type="checkbox"]');
     if (!control) return;
     if (control.matches('[data-back-menu], #quitBtn')) audio.uiBack();
-    else if (!control.matches('.upgrade-card, .route-card, .meta-buy, #rerollBtn, #soundTestBtn')) audio.uiSelect();
+    else if (!control.matches('.upgrade-select, .route-card, .meta-buy, #rerollBtn, #soundTestBtn')) audio.uiSelect();
   });
 
   $('#masterVolume').addEventListener('input', (event) => {
@@ -8355,6 +8580,8 @@
         choices: currentUpgradeChoices.map((choice) => ({ id: choice.upgrade.id, rarity: choice.rarityKey })),
         lockedChoiceIds: [...lockedUpgradeIds],
         runHistoryCount: loadRunHistory().length,
+        keyBindings: getKeyBindingStatus(),
+        economy: getRunEconomyStatus(),
         runCores,
         bankedCores: saveData.cores,
         payoutPreview: player && !runSettled ? calculateCorePayout(1) : lastCorePayout,

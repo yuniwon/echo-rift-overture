@@ -1,8 +1,9 @@
-const CACHE_NAME = 'echo-rift-hardening-v6.10.0';
+const CACHE_NAME = 'echo-rift-control-v6.11.0';
 const CORE_ASSETS = [
   './',
   './index.html',
   './css/style.css',
+  './js/control-bindings.js',
   './js/game.js',
   './manifest.webmanifest',
   './icons/icon.svg',

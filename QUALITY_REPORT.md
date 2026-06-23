@@ -1,4 +1,10 @@
-# ECHO RIFT 6.9 Quality Loop Report
+# ECHO RIFT Quality Loop Report
+
+## 현재 상태 — 6.11 CONTROL
+
+Iteration 1에서 import/service-worker 하드닝과 행동 기반 회귀 검증을 추가했고, Iteration 2에서 키보드 리매핑, 강화 카드 접근성 구조, 부분 리롤 경제 계측, 90초 Playwright 전투/컨트롤 루프를 추가했다. 이 보고서의 초기 6.9 기준선은 보존하되, 현재 자동 검증 기준은 `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+
+아직 완료로 주장하지 않는 항목은 물리 게임패드 리매핑, 조준 감도/데드존/축 반전, 터치 버튼 위치 편집, 저사양 모바일 실기기, 오디오 청감, 필수 뷰포트 캡처 세트다.
 
 ## 결과 요약
 
@@ -27,7 +33,7 @@
 ## 남은 외부 검증
 
 - 필수 뷰포트 스크린샷: 2560x1440, 1440x900, 390x844, 320x568, 667x375
-- 실제 first-ten-minute 플레이 캡처와 90초 기본 전투 계측
+- 실제 first-ten-minute 플레이 캡처
 - 좋은 잔향 기록과 나쁜 잔향 기록의 수치 비교
 - 보스 인트로 중 피해 0 QA probe 재실행 및 캡처
 - 오디오 청감: lock, deploy, convergence, boss release, damage, death의 구분감
@@ -35,4 +41,4 @@
 
 ## 완료 판정
 
-이 패스는 품질 루프의 시작 조건을 정리한 것이며, 프롬프트의 최종 stopping condition을 만족했다고 주장하지 않는다. Iteration 1에서 행동 기반 Playwright 검증과 import/service-worker 하드닝을 추가했지만, required viewport screenshot set과 90초 전투 계측은 아직 별도 반복이 필요하다.
+이 패스는 품질 루프의 시작 조건을 정리한 것이며, 프롬프트의 최종 stopping condition을 만족했다고 주장하지 않는다. Iteration 1에서 행동 기반 Playwright 검증과 import/service-worker 하드닝을 추가했고, Iteration 2에서 90초 전투/컨트롤 계측 루프를 추가했다. 다만 required viewport screenshot set, 물리 입력 장치, 오디오 청감, 저사양 모바일 검증은 아직 별도 반복이 필요하다.
