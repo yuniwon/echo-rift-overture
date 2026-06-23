@@ -149,3 +149,7 @@ The remaining P0 risk is that player control and partial-reroll economy changes 
 - Low-end mobile and physical gamepad validation
 - Audio listening validation
 - Broad `game.js` module split beyond the new control binding boundary
+
+### Patch 6.11.1
+
+Chrome mouse regression fixed: clicking a non-control area of an upgrade card selects the choice again, while lock clicks remain lock-only. `verify-6.11-control` now covers body click selection, lock click non-selection, and explicit select button selection.

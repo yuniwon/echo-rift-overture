@@ -150,6 +150,25 @@ async function runBrowserChecks() {
     check('reroll economy averages locked cards', rerollProbe.afterEconomy?.averageLockedCards === 2, JSON.stringify(rerollProbe.afterEconomy));
     check('post-reroll selection increments metric', rerollProbe.afterChooseEconomy?.postRerollSelections === 1, JSON.stringify(rerollProbe.afterChooseEconomy));
 
+    const mouseChoiceProbe = await page.evaluate(() => {
+      const qa = window.__echoRiftQA;
+      qa.showDraft(['magnet', 'regen', 'coreHunter', 'echoCount'], ['common', 'uncommon', 'rare', 'epic']);
+      document.querySelector('.upgrade-card .upgrade-title-wrap')?.click();
+      const afterBodyClick = { state: window.echoRiftStatus.state, level: window.echoRiftStatus.level, choices: window.echoRiftStatus.choices.length };
+
+      qa.showDraft(['magnet', 'regen', 'coreHunter', 'echoCount'], ['common', 'uncommon', 'rare', 'epic']);
+      document.querySelector('.upgrade-card .upgrade-lock')?.click();
+      const afterLockClick = { state: window.echoRiftStatus.state, level: window.echoRiftStatus.level, locked: window.echoRiftStatus.lockedChoiceIds.length, choices: window.echoRiftStatus.choices.length };
+
+      qa.showDraft(['magnet', 'regen', 'coreHunter', 'echoCount'], ['common', 'uncommon', 'rare', 'epic']);
+      document.querySelector('.upgrade-card .upgrade-select')?.click();
+      const afterSelectClick = { state: window.echoRiftStatus.state, level: window.echoRiftStatus.level, choices: window.echoRiftStatus.choices.length };
+      return { afterBodyClick, afterLockClick, afterSelectClick };
+    });
+    check('upgrade card body click selects choice', mouseChoiceProbe.afterBodyClick.state === 'playing' && mouseChoiceProbe.afterBodyClick.choices === 0, JSON.stringify(mouseChoiceProbe.afterBodyClick));
+    check('upgrade lock click toggles without selecting', mouseChoiceProbe.afterLockClick.state === 'upgrade' && mouseChoiceProbe.afterLockClick.locked === 1, JSON.stringify(mouseChoiceProbe.afterLockClick));
+    check('upgrade select button still selects choice', mouseChoiceProbe.afterSelectClick.state === 'playing' && mouseChoiceProbe.afterSelectClick.choices === 0, JSON.stringify(mouseChoiceProbe.afterSelectClick));
+
     const allLockedProbe = await page.evaluate(() => {
       const qa = window.__echoRiftQA;
       qa.showDraft(['dashCD', 'attackSpeed', 'shieldMax', 'xpBoost'], ['common', 'common', 'uncommon', 'rare']);

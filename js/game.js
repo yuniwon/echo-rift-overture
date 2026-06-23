@@ -107,7 +107,7 @@
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '6.11.0';
+  const GAME_VERSION = '6.11.1';
   const MAX_ENEMY_BULLETS = 680;
   const MAX_PLAYER_BULLETS = 360;
   const WORLD_UNITS_PER_METER = 10;
@@ -4235,6 +4235,10 @@
         event.preventDefault();
         event.stopPropagation();
         toggleUpgradeLock(choice);
+      });
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+        selectUpgrade(choice);
       });
       card.appendChild(lock);
       UI.upgradeChoices.appendChild(card);

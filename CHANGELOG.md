@@ -1,5 +1,18 @@
 # 변경 내역
 
+## 6.11.1 — OVERTURE / CONTROL PATCH
+
+### Chrome 마우스 선택 회귀 수정
+
+- 6.11의 `<article>` 기반 강화 카드에서 카드 본문 클릭이 선택으로 이어지지 않던 문제 수정
+- 잠금 버튼 클릭은 잠금만 토글하고 선택되지 않도록 유지
+- 명시적 선택 버튼과 숫자 단축키 경로는 그대로 유지
+- 서비스워커 cache name을 `echo-rift-control-v6.11.1`로 갱신
+
+### 검증
+
+- `scripts/verify-6.11-control.mjs`에 카드 본문 클릭, 잠금 클릭 비선택, 선택 버튼 클릭 회귀 테스트 추가
+
 ## 6.11.0 — OVERTURE / CONTROL
 
 ### 입력 리매핑

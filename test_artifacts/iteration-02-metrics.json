@@ -4,13 +4,14 @@
   "timestamp": "2026-06-24T00:00:00+09:00",
   "build": {
     "name": "ECHO RIFT: OVERTURE",
-    "version": "6.11.0",
+    "version": "6.11.1",
     "codename": "CONTROL"
   },
   "runtimeChanges": [
     "keyboard remapping settings",
     "control binding helper boundary",
     "upgrade card select and lock sibling buttons",
+    "upgrade card body mouse selection restored",
     "partial reroll economy instrumentation",
     "90-second Playwright control and combat probe"
   ],
@@ -51,6 +52,8 @@
     "settingsKeyRemapReloadPersistence": "passed",
     "settingsKeyReset": "passed",
     "upgradeCardSiblingControls": "passed",
+    "upgradeCardBodyMouseSelect": "passed",
+    "upgradeLockMouseDoesNotSelect": "passed",
     "partialRerollEconomyMetrics": "passed",
     "allLockedRerollNoEconomySpend": "passed",
     "ninetySecondControlCombatLoop": "passed"

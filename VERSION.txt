@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 6.11.0
+Version 6.11.1
 Codename: CONTROL
 Build date: 2026-06-24
-Focus: player control and instrumentation. Keyboard actions can be remapped in settings, upgrade card select/lock controls are no longer nested, partial-reroll economy signals are recorded locally, and a 90-second Playwright control/combat probe verifies the long-running behavior path alongside the 6.10 hardening checks.
+Focus: player control and instrumentation. Keyboard actions can be remapped in settings, upgrade card select/lock controls are no longer nested, partial-reroll economy signals are recorded locally, and a 90-second Playwright control/combat probe verifies the long-running behavior path alongside the 6.10 hardening checks. Patch 6.11.1 restores mouse selection from the upgrade card body while preserving sibling select/lock controls.

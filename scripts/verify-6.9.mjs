@@ -106,12 +106,12 @@ function assertRunHistory() {
 function assertReleaseMetadata() {
   const manifest = JSON.parse(files.manifest);
   check('manifest product name is player-facing', manifest.name === 'ECHO RIFT: OVERTURE', manifest.name);
-  check('service worker cache updated', includes(files.sw, "const CACHE_NAME = 'echo-rift-control-v6.11.0';"));
+  check('service worker cache updated', includes(files.sw, "const CACHE_NAME = 'echo-rift-control-v6.11.1';"));
   check('title updated', includes(files.html, 'ECHO RIFT: OVERTURE'));
   check('edition badge updated', includes(files.html, 'v6.11 · CONTROL'));
-  check('VERSION updated', includes(files.version, 'Version 6.11.0') && includes(files.version, 'Codename: CONTROL'));
+  check('VERSION updated', includes(files.version, 'Version 6.11.1') && includes(files.version, 'Codename: CONTROL'));
   check('README updated', includes(files.readme, '6.11') && includes(files.readme, 'CONTROL'));
-  check('CHANGELOG has 6.11.0 first section', match(files.changelog, /^# .+\r?\n\r?\n## 6\.11\.0 — OVERTURE \/ CONTROL/m));
+  check('CHANGELOG has 6.11.1 first section', match(files.changelog, /^# .+\r?\n\r?\n## 6\.11\.1 — OVERTURE \/ CONTROL PATCH/m));
   check('TECHNICAL_NOTES updated', includes(files.technical, '6.11') && includes(files.technical, 'verify-6.11-control'));
   check('QA_REPORT updated', includes(files.qa, '6.11') && includes(files.qa, 'CONTROL'));
 }
