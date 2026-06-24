@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 7.0.0
-Codename: PRISM
+Version 7.0.2
+Codename: PRISM FIELD
 Build date: 2026-06-24
-Focus: combat rendering performance. Hot projectile/particle glow now uses pre-rendered additive glow sprites instead of Canvas shadow blur, automatic quality downgrade is driven by measured frame time while preserving sticky one-way behavior, and the QA render benchmark records fixed bullet/particle scenes for before/after comparison.
+Focus: first-run core feel. The first normal run now shows a concise non-blocking field coach for recording a combat-ready echo, deploying it, and pairing present/echo hits into a phase rift. Rendering, combat balance, tutorial step counts, and offline dependency boundaries remain unchanged.
