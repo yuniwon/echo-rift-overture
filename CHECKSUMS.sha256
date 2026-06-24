@@ -6,7 +6,7 @@ e95954647c02f4e2c18a92e3aa9887e55f7a4b8a6164c34c655e5b7d52f291b5  ./BASELINE_AUD
 17ff9dedfc53f6007453f17d92ebc6e16c5281b7765cf6ed6a75c0410945e245  ./codex-handoff/02_WORK_INSTRUCTIONS.md
 3ef6bab6fd05d3a8a39476e9d11faad207b94315ffa549e06fe4afe5b2758d84  ./codex-handoff/03_CODE_EXAMPLES.md
 83e5a916152818abe0d4d4c943f65b36bc203547d010a33d1a50e5d94cbd4565  ./codex-handoff/04_CODEX_PROMPT.md
-51f37d448c37b622764ff867d38bf2ccecd0a74a5864fcc891e58ef59ebf61bb  ./css/style.css
+82fb0b26bde7487dc8400585696bee30ffac8a5ba3e0205a31aa3b4bd57ee562  ./css/style.css
 d4d84e96426b5f8d55c3b2aab7d831a1234cdd0c3dc154fed96748ff9b3ba4c5  ./icons/icon-192.png
 503b9ac656554d9ee7bba2c2f5263142b35159919487d2f8998ae67da6193d17  ./icons/icon-512.png
 9f0c2df497bdc6fba8bc2899f515247da37dad8ca3a8b1b8e141918a96df31a6  ./icons/icon.svg
@@ -15,7 +15,7 @@ ab9b0414c1dca072a802e1ac273dfae268f9c33c795fd0a503fb18c7964c5c84  ./icons/maskab
 33777c7a7e44f4ef9a5ec1b712da1367df97d79d756bff8ca6d6709de8f86adc  ./IMPLEMENTATION_PLAN.md
 5549bfd800ecbddc1954c2d22add302d83d6a3aad9539a3d2bc2438195b17bfe  ./index.html
 c526d5e24db4dd6cebe4eafdb095b3955f54213180f0301157d56cc7818da68c  ./js/control-bindings.js
-9abdb8a79f197d511d59e5d4b9d5da4b84e09b64ad5f9bc02818c0eccaff9f97  ./js/game.js
+f0b69fa351a6e5a07b577509da70fdd595145a163eabb00c7e68b70a1ea6a802  ./js/game.js
 b63830af46b7ed8bf8a73654f7299a0845f6777036bcc768702d4e1c48345342  ./LICENSE.txt
 66a18ccf032acf183f3e8ef480ca9f9b5167fc95768016dbc2de994dbae9a1f6  ./manifest.webmanifest
 da0c09e2c4d5fde8b98bcdff23f5881906af5ec1aa457f156874e03486d43c96  ./PROGRESS.md
@@ -28,7 +28,7 @@ d7b3ad35a12245002eacc4976368533b7963cccca4ae5ee24a0444c23eaee4d4  ./QUALITY_REPO
 81e235fdbe08eb76c4d813d883b3f9caa245443832c60977736c77bb33f11ad4  ./scripts/verify-6.11-control.mjs
 a1204b1ba55dde004ff42e121a61b93ba69e84b8e4c56c473d5008835d5e79e6  ./scripts/verify-6.9.mjs
 835f88e4e8902074c3456495ef4c19daf8d0af83106bf3cad8a027d91f489d61  ./scripts/verify-7.0-render.mjs
-f787877992bef98bcdab2733c1652c26bfeb4fb3f943c0ae83e3c72840afe2f8  ./scripts/verify-route-layout.mjs
+041c3802bccd19f880f99498e8e91855059069e92c8d1dc24afd2064497251ec  ./scripts/verify-route-layout.mjs
 c7947bba0660ddd0e917aac36c8943288777f10a941ef7f14be060c574749d73  ./START_HERE.txt
 3c7b9e87d3af8ed10413d47dffb629af405cdd43268c4f6f2f1e8b47e98108c5  ./start_mac_linux.sh
 180f0e5c71cd4f51fa7a6a106e9b9acc7c867e008e247d4dfe7b47ecdd937adf  ./start_windows.bat

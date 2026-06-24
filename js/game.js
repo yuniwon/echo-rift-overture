@@ -4518,6 +4518,10 @@
     return changed.length ? changed.map((metric) => `${metric.label} ${metric.text}`).join(' · ') : '모든 전투 수치 기본';
   }
 
+  function routeCardImpactSummary(forecast) {
+    return routeForecastSummary(forecast, 3).replace('모든 전투 수치 기본', '전투 수치 기본');
+  }
+
   function renderForecastMetrics(forecast) {
     return forecast.metrics.map((metric) => {
       const tone = metric.percent > 0.5 ? (metric.key === 'xp' || metric.key === 'core' ? 'reward' : 'danger') : metric.percent < -0.5 ? 'relief' : 'neutral';
@@ -4619,7 +4623,7 @@
         <div class="route-effects route-card-facts">
           <div class="route-effect anomaly"><span>기본 이상 현상</span><b>${escapeHtml(anomalyText)}</b></div>
           <div class="route-effect reward"><span>즉시·완료 보상</span><b>${escapeHtml(route.reward.replace('보상 · ',''))}</b></div>
-          <div class="route-effect forecast"><span>최종 전투 수치 · 확정</span><b>${escapeHtml(routeForecastSummary(forecast,6))}</b></div>
+          <div class="route-effect forecast"><span>핵심 변화 · 확정</span><b>${escapeHtml(routeCardImpactSummary(forecast))}</b></div>
         </div>`;
       button.addEventListener('pointerenter',()=>setRoutePreview(route,index));
       button.addEventListener('focus',()=>setRoutePreview(route,index));
