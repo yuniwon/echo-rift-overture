@@ -60,6 +60,14 @@
     echoReport: $('#echoReport'),
     echoReportMain: $('#echoReportMain'),
     echoReportSub: $('#echoReportSub'),
+    fieldCoach: $('#fieldCoach'),
+    fieldCoachStepLabel: $('#fieldCoachStepLabel'),
+    fieldCoachProgressText: $('#fieldCoachProgressText'),
+    fieldCoachProgressBar: $('#fieldCoachProgressBar'),
+    fieldCoachTitle: $('#fieldCoachTitle'),
+    fieldCoachBody: $('#fieldCoachBody'),
+    fieldCoachHint: $('#fieldCoachHint'),
+    fieldCoachDismiss: $('#fieldCoachDismiss'),
     replayVerified: $('#replayVerified'),
     syncSuccess: $('#syncSuccess'),
     tutorialCoach: $('#tutorialCoach'),
@@ -107,7 +115,7 @@
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '7.0.0';
+  const GAME_VERSION = '7.0.2';
   const THIRD_PARTY_AUDIO_ASSETS = Object.freeze({
     uiHover: './assets/audio/kenney-ui/ui-hover.ogg',
     uiSelect: './assets/audio/kenney-ui/ui-select.ogg',
@@ -396,6 +404,7 @@
       wins: 0,
       tutorialSeen: false,
       advancedTutorialSeen: false,
+      fieldCoachSeen: false,
       cores: 0,
       totalCores: 0,
       meta: { ...defaultMeta },
@@ -419,6 +428,7 @@
       wins: typeof source.wins === 'number' && Number.isFinite(source.wins) ? Math.max(0, Math.floor(source.wins)) : 0,
       tutorialSeen: source.tutorialSeen === true,
       advancedTutorialSeen: source.advancedTutorialSeen === true,
+      fieldCoachSeen: source.fieldCoachSeen === true,
       cores: typeof source.cores === 'number' && Number.isFinite(source.cores) ? Math.max(0, Math.floor(source.cores)) : 0,
       totalCores: typeof source.totalCores === 'number' && Number.isFinite(source.totalCores) ? Math.max(0, Math.floor(source.totalCores)) : 0,
       meta,
@@ -2333,6 +2343,7 @@
   let lastEchoReport = null;
   let echoReportTimer = null;
   let tutorial = null;
+  let fieldCoach = null;
   let nextEntityId = 1;
   let wakeLock = null;
   let toastTimer = null;
@@ -2920,6 +2931,141 @@
     return `REC 확인 · ${names.echo}을 누르는 순간 LOCK, 모두 놓으면 같은 3초를 재현`;
   }
 
+  const FIELD_COACH_TIMEOUT = 64;
+  const fieldCoachSteps = [
+    {
+      key: 'record',
+      title: '전투용 3초를 녹음하세요',
+      body: (n) => `${n.move}으로 움직이며 ${n.aimFire}하세요. 지금 만든 3초가 곧 두 번째 사격 라인이 됩니다.`,
+      hint: () => 'REC 타임라인: 청록은 이동, 보라는 사격 기록입니다.',
+    },
+    {
+      key: 'deploy',
+      title: '방금 만든 과거를 호출하세요',
+      body: (n) => `${n.echo}으로 기록한 3초를 호출하세요. 잔향이 같은 이동과 사격을 다시 실행합니다.`,
+      hint: () => 'ECHO 패널이 준비 상태일 때 호출하면 쿨다운이 소모됩니다.',
+    },
+    {
+      key: 'pair',
+      title: '같은 적을 함께 맞히세요',
+      body: () => '잔향이 맞힌 적을 현재 몸도 1.2초 안에 맞히세요. 노란 균열이 열리면 집중 사격할 시간입니다.',
+      hint: () => 'PHASE RIFT가 뜨면 그 적이 1.6초 동안 추가 피해를 받습니다.',
+    },
+  ];
+
+  function getFieldCoachStatus() {
+    const active = Boolean(fieldCoach?.active);
+    const step = active ? clamp(fieldCoach.step || 0, 0, fieldCoachSteps.length - 1) : -1;
+    return {
+      active,
+      seen: saveData.fieldCoachSeen === true,
+      step,
+      key: active ? fieldCoachSteps[step].key : null,
+      progress: Number((fieldCoach?.progress || 0).toFixed(3)),
+      elapsed: Number((fieldCoach?.elapsed || 0).toFixed(2)),
+      visible: Boolean(UI.fieldCoach && !UI.fieldCoach.classList.contains('hidden')),
+      reason: fieldCoach?.reason || null,
+    };
+  }
+
+  function refreshFieldCoachCopy(force = false) {
+    if (!fieldCoach?.active || !UI.fieldCoach) return;
+    const names = tutorialInputNames();
+    const step = clamp(fieldCoach.step || 0, 0, fieldCoachSteps.length - 1);
+    const signature = `${step}:${names.device}:${echoControlModeForDevice(names.device)}`;
+    if (!force && fieldCoach.copySignature === signature) return;
+    fieldCoach.copySignature = signature;
+    const data = fieldCoachSteps[step];
+    if (UI.fieldCoachStepLabel) UI.fieldCoachStepLabel.textContent = `RIFT COACH · ${step + 1}/${fieldCoachSteps.length}`;
+    if (UI.fieldCoachTitle) UI.fieldCoachTitle.textContent = data.title;
+    if (UI.fieldCoachBody) UI.fieldCoachBody.textContent = data.body(names);
+    if (UI.fieldCoachHint) UI.fieldCoachHint.textContent = data.hint(names);
+  }
+
+  function setFieldCoachStep(step) {
+    if (!fieldCoach?.active) return;
+    fieldCoach.step = clamp(step, 0, fieldCoachSteps.length - 1);
+    fieldCoach.stepElapsed = 0;
+    fieldCoach.progress = 0;
+    fieldCoach.copySignature = '';
+    fieldCoach.startEchoActivations = echoActivations;
+    fieldCoach.startPhaseRifts = phaseRiftProcs;
+    refreshFieldCoachCopy(true);
+    if (UI.fieldCoachProgressBar) UI.fieldCoachProgressBar.style.width = '0%';
+    if (UI.fieldCoachProgressText) UI.fieldCoachProgressText.textContent = '0%';
+  }
+
+  function startFieldCoach(options = {}) {
+    if (!player || gameState !== 'playing' || tutorial?.active || currentWave?.isBoss) return false;
+    if (saveData.fieldCoachSeen && !options.force) return false;
+    fieldCoach = {
+      active: true,
+      step: 0,
+      elapsed: 0,
+      stepElapsed: 0,
+      progress: 0,
+      reason: 'active',
+      startEchoActivations: echoActivations,
+      startPhaseRifts: phaseRiftProcs,
+      copySignature: '',
+    };
+    UI.fieldCoach?.classList.remove('hidden');
+    document.body.dataset.fieldCoach = 'active';
+    setFieldCoachStep(0);
+    return true;
+  }
+
+  function finishFieldCoach(reason = 'complete', markSeen = true) {
+    if (!fieldCoach) return false;
+    fieldCoach.active = false;
+    fieldCoach.reason = reason;
+    UI.fieldCoach?.classList.add('hidden');
+    delete document.body.dataset.fieldCoach;
+    if (markSeen && saveData.fieldCoachSeen !== true) {
+      saveData.fieldCoachSeen = true;
+      saveJSON(SAVE_KEY, saveData);
+    }
+    if (reason === 'complete') showToast('첫 위상 균열 기록 · 과거와 현재가 같은 적을 열었습니다', 2600);
+    else if (reason === 'timeout') showToast('전술 코치 종료 · 교차 사격은 고급 전술 훈련에서 다시 연습할 수 있습니다', 2600);
+    return true;
+  }
+
+  function updateFieldCoach(dt) {
+    if (!fieldCoach?.active || !player || gameState !== 'playing' || tutorial?.active) return;
+    if (currentWave?.isBoss || bossCutsceneActive()) {
+      UI.fieldCoach?.classList.add('hidden');
+      return;
+    }
+    UI.fieldCoach?.classList.remove('hidden');
+    fieldCoach.elapsed += dt;
+    fieldCoach.stepElapsed += dt;
+    refreshFieldCoachCopy();
+    let progress = 0;
+    if (fieldCoach.step === 0) {
+      const analysis = analyzeEchoBuffer();
+      progress = Math.min(clamp(analysis.coverage / 0.72, 0, 1), clamp(analysis.shots / 3, 0, 1));
+    } else if (fieldCoach.step === 1) {
+      if (echoActivations > fieldCoach.startEchoActivations) progress = 1;
+      else if (input.isEchoLocked()) progress = 0.68;
+      else if (input.isEchoPreviewing()) progress = 0.48;
+      else progress = player.echoCooldown <= 0.05 ? 0.22 : 0.08;
+    } else {
+      if (phaseRiftProcs > fieldCoach.startPhaseRifts) progress = 1;
+      else if (arrays.enemies.some((enemy) => !enemy.dead && enemy.phaseRiftTime > 0)) progress = 0.88;
+      else progress = Math.min(0.58, 0.18 + clamp(fieldCoach.stepElapsed / 24, 0, 1) * 0.4);
+    }
+    fieldCoach.progress = progress;
+    const percent = Math.round(progress * 100);
+    if (UI.fieldCoachProgressBar) UI.fieldCoachProgressBar.style.width = `${percent}%`;
+    if (UI.fieldCoachProgressText) UI.fieldCoachProgressText.textContent = `${percent}%`;
+    if (progress >= 1) {
+      if (fieldCoach.step < fieldCoachSteps.length - 1) setFieldCoachStep(fieldCoach.step + 1);
+      else finishFieldCoach('complete', true);
+      return;
+    }
+    if (fieldCoach.elapsed >= FIELD_COACH_TIMEOUT) finishFieldCoach('timeout', true);
+  }
+
   const tutorialSteps = [
     { title: '이동하며 표적을 맞히세요', body: (n) => `${n.move}으로 움직이면서 ${n.aimFire}하세요. 오른쪽 훈련 표적을 맞히면 이동과 사격이 REC 타임라인에 함께 쌓입니다.`, hint: () => '청록은 이동, 보라는 사격, 청록+보라는 이동하며 사격한 시간입니다.' },
     { title: '조준하고 사격하세요', body: (n) => `${n.aimFire}하세요. 오른쪽 훈련 표적을 한 번 이상 맞히세요.`, hint: () => '보라 구간은 사격, 청록+보라 분할은 이동하며 사격한 시간입니다.' },
@@ -3187,7 +3333,7 @@
     }
   }
 
-  function startEchoTutorial(mode = 'basic') {
+  function startEchoTutorial(mode = 'basic', options = {}) {
     if (!player || !currentWave) return;
     const sequence = tutorialSequence(mode);
     tutorial = {
@@ -3196,6 +3342,7 @@
       replayEchoId: null, replayStat: null, replayHit: false, replayVerified: false, replayVerifiedAt: 0,
       replayLockedSignature: 'empty', replayLockedFrames: 0, replayDeployedSignature: 'empty', replaySignatureMatch: null,
       syncSuccess: false, syncFailures: 0, syncLastDelta: NaN, syncWindowSeconds: NaN, copySignature: '',
+      fieldCoachAfter: Boolean(options.fieldCoachAfter),
     };
     currentWave.spawnTimer = 9999;
     currentWave.spawnRemaining = Math.max(0, currentWave.spawnRemaining || 0);
@@ -3274,6 +3421,9 @@
       ? '고급 훈련 완료 · 교차 사격 퍼즐과 리포트까지 확인했습니다'
       : '기본 훈련 완료 · 고급 잔향 훈련은 메뉴에서 언제든 연습할 수 있습니다';
     showToast(skipped ? '훈련을 종료했습니다 · 실제 시간선 진입' : doneText, 3400);
+    if (tutorial?.fieldCoachAfter && !saveData.fieldCoachSeen) {
+      window.setTimeout(() => gameState === 'playing' && startFieldCoach(), 1200);
+    }
   }
 
   function updateEchoTutorial(dt) {
@@ -4955,6 +5105,8 @@
     const forceTutorial = Boolean(options && options.training === true);
     const tutorialMode = options?.advancedTraining ? 'advanced' : options?.fullTraining ? 'full' : 'basic';
     const wantsTutorial = forceTutorial || !saveData.tutorialSeen;
+    const wantsFieldCoachAfterTutorial = !forceTutorial && !saveData.fieldCoachSeen && wantsTutorial;
+    const wantsFieldCoachNow = !forceTutorial && !wantsTutorial && (options?.fieldCoach === true || !saveData.fieldCoachSeen);
     clearWorld();
     runSeed = Date.now() ^ Math.floor(Math.random() * 0xFFFFFF);
     player = createPlayer();
@@ -4992,9 +5144,11 @@
     clearTimeout(echoReportTimer);
     echoReportTimer = null;
     tutorial = null;
+    fieldCoach = null;
     currentWave = null;
     UI.echoReport?.classList.add('hidden');
     UI.tutorialCoach?.classList.add('hidden');
+    UI.fieldCoach?.classList.add('hidden');
     UI.replayVerified?.classList.add('hidden');
     UI.syncSuccess?.classList.add('hidden');
     quality = configuredQualityTier();
@@ -5008,6 +5162,7 @@
     gameState = 'playing';
     document.body.classList.add('game-running');
     document.body.classList.remove('choice-open');
+    delete document.body.dataset.fieldCoach;
     saveData.runs++;
     saveJSON(SAVE_KEY, saveData);
     showScreen(null);
@@ -5024,7 +5179,9 @@
     if (wantsTutorial) {
       // Enter training in the same task as wave creation. No normal spawn can
       // race the tutorial setup, even on a heavily delayed first frame.
-      startEchoTutorial(tutorialMode);
+      startEchoTutorial(tutorialMode, { fieldCoachAfter: wantsFieldCoachAfterTutorial });
+    } else if (wantsFieldCoachNow) {
+      window.setTimeout(() => gameState === 'playing' && startFieldCoach({ force: options?.fieldCoach === true }), 900);
     } else if (Object.values(saveData.meta).some((level) => level > 0)) {
       window.setTimeout(() => gameState === 'playing' && showToast('영구 기억이 적용되었습니다 · 이전 실패가 출발선을 밀어 올립니다', 2600), 1100);
     } else {
@@ -6968,6 +7125,7 @@
     updatePlayer(dt);
     updateEchoes(dt);
     updateEchoTutorial(dt);
+    updateFieldCoach(dt);
     updateEnemies(dt);
     enemyGrid.rebuild(arrays.enemies);
     updateLasers(dt);
@@ -7052,6 +7210,7 @@
     document.body.classList.remove('boss-intro-active');
     UI.toast.classList.add('hidden');
     UI.tutorialCoach?.classList.add('hidden');
+    UI.fieldCoach?.classList.add('hidden');
     UI.replayVerified?.classList.add('hidden');
     UI.syncSuccess?.classList.add('hidden');
     UI.echoReport?.classList.add('hidden');
@@ -7095,6 +7254,7 @@
     document.body.classList.remove('boss-intro-active');
     UI.toast.classList.add('hidden');
     UI.tutorialCoach?.classList.add('hidden');
+    UI.fieldCoach?.classList.add('hidden');
     UI.replayVerified?.classList.add('hidden');
     UI.syncSuccess?.classList.add('hidden');
     UI.echoReport?.classList.add('hidden');
@@ -7155,10 +7315,13 @@
     UI.waveBanner.classList.add('hidden');
     UI.toast.classList.add('hidden');
     UI.tutorialCoach?.classList.add('hidden');
+    UI.fieldCoach?.classList.add('hidden');
     UI.replayVerified?.classList.add('hidden');
     UI.syncSuccess?.classList.add('hidden');
     UI.echoReport?.classList.add('hidden');
     tutorial = null;
+    fieldCoach = null;
+    delete document.body.dataset.fieldCoach;
     pendingRouteChoices = [];
     pendingRouteWave = 0;
     pendingRouteBaseModifier = null;
@@ -8573,6 +8736,7 @@
   $('#trainingBtn')?.addEventListener('click', () => startGame({ training: true }));
   $('#advancedTrainingBtn')?.addEventListener('click', () => startGame({ training: true, advancedTraining: true }));
   $('#tutorialSkipBtn')?.addEventListener('click', () => finishEchoTutorial(true));
+  $('#fieldCoachDismiss')?.addEventListener('click', () => finishFieldCoach('dismissed', true));
   $('#retryBtn').addEventListener('click', startGame);
   $('#restartBtn').addEventListener('click', restartRun);
   $('#resumeBtn').addEventListener('click', resumeGame);
@@ -9102,6 +9266,7 @@
           damageMultiplier: PHASE_RIFT_DAMAGE_MULT,
           cooldown: PHASE_RIFT_COOLDOWN,
         },
+        fieldCoach: getFieldCoachStatus(),
         input: {
           lastDevice: input.lastDevice,
           resolvedDevice: resolvedInputDeviceFamily(),
@@ -9176,6 +9341,15 @@
         startTraining: () => startGame({ training: true }),
         startAdvancedTraining: () => startGame({ training: true, advancedTraining: true }),
         skipTraining: () => { finishEchoTutorial(true); return !tutorial?.active; },
+        startFieldCoachProbe: () => {
+          saveData.tutorialSeen = true;
+          saveData.fieldCoachSeen = false;
+          saveJSON(SAVE_KEY, saveData);
+          startGame({ fieldCoach: true });
+          return window.echoRiftStatus.fieldCoach;
+        },
+        fieldCoachStatus: () => window.echoRiftStatus.fieldCoach,
+        dismissFieldCoach: () => { finishFieldCoach('dismissed', true); return window.echoRiftStatus.fieldCoach; },
         activateEcho: () => { if (!player || gameState !== 'playing') return false; player.echoCooldown = 0; activateEcho(); return arrays.echoes.length > 0; },
         status: () => window.echoRiftStatus,
         lockChoice: (index = 0) => {

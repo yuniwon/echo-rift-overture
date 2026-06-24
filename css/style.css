@@ -435,7 +435,7 @@ body.high-contrast .result-panel { background: #050b1e; border-color: rgba(255,2
 .touch-controls { position: fixed; inset: 0; z-index: 26; pointer-events: none; }.stick-zone { position: absolute; bottom: calc(24px + var(--safe-bottom)); width: 38vw; height: 42vh; pointer-events: auto; touch-action: none; }.stick-zone.left{left:0}.stick-zone.right{right:0}.stick-base { position: absolute; left: 50%; bottom: 18px; width: 112px; height: 112px; transform: translateX(-50%); border: 1px solid rgba(126,215,255,.28); border-radius: 50%; background: radial-gradient(circle,rgba(76,129,171,.13),rgba(13,24,50,.25)); box-shadow: inset 0 0 25px rgba(75,205,255,.08); opacity: .68; }.stick-knob { position: absolute; left: 30px; top: 30px; width: 52px; height: 52px; border: 1px solid rgba(98,233,255,.55); border-radius: 50%; background: rgba(69,140,176,.22); box-shadow: 0 0 20px rgba(98,233,255,.2); }.touch-action { position: absolute; width: 60px; height: 60px; display: grid; place-items: center; border: 1px solid rgba(98,233,255,.48); border-radius: 50%; color: var(--cyan); background: rgba(9,21,43,.78); box-shadow: 0 0 24px rgba(98,233,255,.15); pointer-events: auto; touch-action: none; }.touch-action svg { width: 28px; height: 28px; }.touch-action.dash { right: 22px; bottom: calc(188px + var(--safe-bottom)); }.touch-action.echo { right: 91px; bottom: calc(145px + var(--safe-bottom)); color: #d29aff; border-color: rgba(202,111,255,.5); }.touch-action:active { transform: scale(.93); background: rgba(61,110,156,.65); }
 
 /* Runtime and accessibility states */
-body.choice-open #hud,body.choice-open #abilityHud,body.choice-open .boss-hud,body.choice-open .wave-banner,body.choice-open .tutorial-coach { opacity: 0 !important; visibility: hidden !important; }
+body.choice-open #hud,body.choice-open #abilityHud,body.choice-open .boss-hud,body.choice-open .wave-banner,body.choice-open .tutorial-coach,body.choice-open .field-coach { opacity: 0 !important; visibility: hidden !important; }
 body.game-running #scanlines { opacity: .04; } body.game-running #nebulaOverlay { opacity: .56; }
 body[data-quality="0"] #scanlines,body[data-quality="0"] #nebulaOverlay { display: none; }
 body[data-quality="0"] .ability-module.ready .ability-glyph,body[data-quality="0"] .hud-vitals.critical { animation: none; }
@@ -585,14 +585,31 @@ body.reduced-motion #scanlines { opacity: .03; }body.reduced-motion *,body.reduc
 .tutorial-footer button { flex:0 0 auto; padding:6px 9px; border:1px solid rgba(255,255,255,.12); border-radius:5px; color:#8096a8; background:rgba(255,255,255,.035); font-size:calc(7px * var(--text-scale)); cursor:pointer; }
 .tutorial-footer button:hover,.tutorial-footer button:focus-visible { color:#dcedf7; border-color:rgba(98,233,255,.36); outline:none; }
 
+.field-coach { position: fixed; z-index: 28; right: max(18px,2vw); top: max(118px,13vh); width: min(390px,calc(100vw - 32px)); display: grid; gap: 8px; padding: 15px 16px 13px; border: 1px solid rgba(126,197,244,.22); border-radius: 10px; color: #eaf7ff; background: linear-gradient(145deg,rgba(13,23,49,.94),rgba(5,9,25,.93)); box-shadow: 0 22px 70px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.04); pointer-events: none; animation: field-coach-in 210ms var(--ease-out) both; }
+.field-coach::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.045; background:repeating-linear-gradient(90deg,transparent 0 28px,#62e9ff 29px 30px); mask-image:linear-gradient(to bottom,#000,transparent); }
+.field-coach > * { position: relative; }
+.field-coach-signal { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#68e9ff; font:900 calc(8px * var(--text-scale))/1 ui-monospace,monospace; letter-spacing:.12em; }
+.field-coach-signal b { color:#78f3c0; font-variant-numeric:tabular-nums; }
+.field-coach h2 { margin: 1px 0 0; color:#f1fbff; font-size: max(20px, calc(17px * var(--text-scale))); line-height:1.16; letter-spacing:-.035em; }
+.field-coach p { margin: 0; color:#a7bbcb; font-size: max(13px, calc(10.8px * var(--text-scale))); line-height:1.5; word-break:keep-all; }
+.field-coach-progress { height: 5px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.07); }
+.field-coach-progress i { display:block; width:0; height:100%; background:linear-gradient(90deg,#62e9ff,#b976ff,#ffd36c); box-shadow:0 0 11px rgba(98,233,255,.65); transition:width 120ms linear; }
+.field-coach-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.field-coach-footer span { color:#73899e; font-size:max(11px, calc(8.8px * var(--text-scale))); line-height:1.35; }
+.field-coach-footer button { flex:0 0 auto; min-height:30px; padding:5px 8px; border:1px solid rgba(255,255,255,.12); border-radius:6px; color:#8ea5b7; background:rgba(255,255,255,.035); font-size:max(10px, calc(7.8px * var(--text-scale))); font-weight:850; cursor:pointer; pointer-events:auto; }
+.field-coach-footer button:hover,.field-coach-footer button:focus-visible { color:#effaff; border-color:rgba(98,233,255,.42); outline:none; }
+@keyframes field-coach-in { from { opacity:0; transform:translateY(8px) scale(.985); } }
+
 .high-contrast .echo-timeline i.move { background:#4ad7ff; }
 .high-contrast .echo-timeline i.fire { background:#d57aff; }
-.reduced-motion .echo-report,.reduced-motion .tutorial-coach { animation:none; }
+.high-contrast .field-coach { border-color:rgba(255,255,255,.48); background:rgba(4,8,22,.97); }
+.reduced-motion .echo-report,.reduced-motion .tutorial-coach,.reduced-motion .field-coach { animation:none; }
 
 @media (min-width: 1800px) {
   .ability-module.echo { min-width: 390px; }
   .echo-timeline { height: 17px; gap: 3px; }
   .tutorial-coach { width: min(720px,calc(100vw - 42px)); padding: 22px 25px 18px; }
+  .field-coach { width:min(440px,calc(100vw - 48px)); padding:18px 20px 16px; }
 }
 
 @media (max-width: 720px) {
@@ -608,12 +625,18 @@ body.reduced-motion #scanlines { opacity: .03; }body.reduced-motion *,body.reduc
   .echo-report { left:10px; right:10px; bottom:calc(184px + var(--safe-bottom)); width:auto; }
   .tutorial-coach { top:max(86px,10vh); padding:15px 16px 13px; }
   .tutorial-coach h2 { font-size:21px; }
+  .field-coach { left:10px; right:10px; top:max(108px,13vh); width:auto; padding:13px 14px 12px; }
   .tutorial-footer { align-items:flex-start; }
 }
 
 @media (max-width: 440px) {
   .tutorial-coach { top:78px; }
   .tutorial-coach p { font-size:12px; }
+  .field-coach { top:88px; gap:6px; }
+  .field-coach h2 { font-size:18px; }
+  .field-coach p { font-size:12px; }
+  .field-coach-footer { align-items:flex-start; flex-direction:column; gap:7px; }
+  .field-coach-footer button { width:100%; }
   .tutorial-footer { flex-direction:column; gap:8px; }
   .tutorial-footer button { width:100%; }
 }
@@ -689,6 +712,14 @@ body.touch-controls-visible .touch-controls { opacity:1; }
   .hud-pilot-mark { width:31px; height:31px; }
   .resource-heading { font-size:9px; }
   .tutorial-coach { top:62px; width:calc(100vw - 12px); padding:10px 11px 9px; border-radius:9px; }
+  .field-coach { left:6px; right:6px; top:82px; width:auto; padding:9px 10px 8px; border-radius:8px; }
+  .field-coach-signal { gap:6px; }
+  .field-coach h2 { margin:5px 0 0; font-size:16px; }
+  .field-coach p { font-size:10.5px; line-height:1.35; }
+  .field-coach-progress { height:4px; }
+  .field-coach-footer { margin-top:0; }
+  .field-coach-footer span { font-size:9px; line-height:1.25; }
+  .field-coach-footer button { min-height:26px; padding:4px 7px; }
   .tutorial-signal { gap:6px; }
   .tutorial-device-badge { max-width:106px; overflow:hidden; text-overflow:ellipsis; }
   .tutorial-coach h2 { margin:7px 0 3px; font-size:17px; }
@@ -718,6 +749,13 @@ body.touch-controls-visible .touch-controls { opacity:1; }
   .resource-row.memory-resource { display:none; }
   .resource-heading { font-size:8px; }
   .tutorial-coach { left:auto; right:8px; top:8px; width:min(430px,57vw); transform:none; padding:9px 11px 8px; border-radius:8px; }
+  .field-coach { left:auto; right:8px; top:72px; width:min(360px,43vw); padding:8px 10px 7px; border-radius:8px; }
+  .field-coach-signal { font-size:9px; gap:7px; }
+  .field-coach h2 { margin:4px 0 0; font-size:15px; }
+  .field-coach p { font-size:9.5px; line-height:1.3; }
+  .field-coach-progress { height:4px; }
+  .field-coach-footer span { display:none; }
+  .field-coach-footer button { margin-left:auto; min-height:24px; padding:3px 7px; font-size:9px; }
   .tutorial-signal { gap:7px; }
   .tutorial-coach h2 { margin:6px 0 2px; font-size:16px; }
   .tutorial-coach p { font-size:10px; line-height:1.32; }
