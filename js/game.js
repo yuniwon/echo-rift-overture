@@ -115,7 +115,7 @@
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '7.0.2';
+  const GAME_VERSION = '7.0.3';
   const THIRD_PARTY_AUDIO_ASSETS = Object.freeze({
     uiHover: './assets/audio/kenney-ui/ui-hover.ogg',
     uiSelect: './assets/audio/kenney-ui/ui-select.ogg',
@@ -2344,6 +2344,7 @@
   let echoReportTimer = null;
   let tutorial = null;
   let fieldCoach = null;
+  let fieldCoachFocusTarget = null;
   let nextEntityId = 1;
   let wakeLock = null;
   let toastTimer = null;
@@ -2965,7 +2966,62 @@
       elapsed: Number((fieldCoach?.elapsed || 0).toFixed(2)),
       visible: Boolean(UI.fieldCoach && !UI.fieldCoach.classList.contains('hidden')),
       reason: fieldCoach?.reason || null,
+      focusTarget: getFieldCoachFocusStatus(),
     };
+  }
+
+  function getFieldCoachFocusStatus() {
+    if (!fieldCoachFocusTarget || !fieldCoach?.active || fieldCoach.step !== 2) return { active: false };
+    const enemy = arrays.enemies.find((candidate) => candidate.id === fieldCoachFocusTarget.enemyId && !candidate.dead);
+    if (!enemy) return { active: false, enemyId: fieldCoachFocusTarget.enemyId || null };
+    return {
+      active: true,
+      enemyId: enemy.id,
+      spawned: Boolean(fieldCoachFocusTarget.spawned),
+      hp: Number(enemy.hp.toFixed(1)),
+      phaseRiftActive: enemy.phaseRiftTime > 0,
+    };
+  }
+
+  function clearFieldCoachFocusTarget() {
+    if (fieldCoachFocusTarget?.enemyId) {
+      const enemy = arrays.enemies.find((candidate) => candidate.id === fieldCoachFocusTarget.enemyId);
+      if (enemy) enemy.fieldCoachFocus = false;
+    }
+    fieldCoachFocusTarget = null;
+  }
+
+  function spawnFieldCoachFocusTarget() {
+    if (!fieldCoach?.active || fieldCoach.step !== 2 || !player || gameState !== 'playing') return null;
+    const existing = fieldCoachFocusTarget?.enemyId
+      ? arrays.enemies.find((candidate) => candidate.id === fieldCoachFocusTarget.enemyId && !candidate.dead)
+      : null;
+    if (existing) return existing;
+
+    let target = arrays.enemies.find((enemy) => !enemy.dead && !enemy.trainingDummy && enemy.type !== 'boss' && enemy.spawnTime <= 0.12);
+    let spawned = false;
+    if (!target) {
+      const x = clamp(player.x + 280, WORLD.margin + 80, WORLD.w - WORLD.margin - 80);
+      const y = clamp(player.y, WORLD.margin + 80, WORLD.h - WORLD.margin - 80);
+      target = spawnEnemy('gunner', x, y, true);
+      spawned = true;
+      if (target) {
+        target.spawnTime = 0;
+        target.hp = target.maxHp = 520;
+        target.speed = 0;
+        target.damage = 0;
+        target.attackMult = 0;
+        target.shootTimer = 9999;
+        target.noReward = true;
+        target.fieldCoachPractice = true;
+        enemyGrid.rebuild(arrays.enemies);
+      }
+    }
+    if (!target) return null;
+    target.fieldCoachFocus = true;
+    fieldCoachFocusTarget = { enemyId: target.id, spawned, createdAt: gameTime };
+    createFloater(target.x, target.y - target.radius - 24, '협공 표적', '#ffe39a', 13);
+    return target;
   }
 
   function refreshFieldCoachCopy(force = false) {
@@ -2990,6 +3046,8 @@
     fieldCoach.copySignature = '';
     fieldCoach.startEchoActivations = echoActivations;
     fieldCoach.startPhaseRifts = phaseRiftProcs;
+    if (fieldCoach.step === 2) spawnFieldCoachFocusTarget();
+    else clearFieldCoachFocusTarget();
     refreshFieldCoachCopy(true);
     if (UI.fieldCoachProgressBar) UI.fieldCoachProgressBar.style.width = '0%';
     if (UI.fieldCoachProgressText) UI.fieldCoachProgressText.textContent = '0%';
@@ -2998,6 +3056,8 @@
   function startFieldCoach(options = {}) {
     if (!player || gameState !== 'playing' || tutorial?.active || currentWave?.isBoss) return false;
     if (saveData.fieldCoachSeen && !options.force) return false;
+    clearFieldCoachFocusTarget();
+    hideWaveBanner();
     fieldCoach = {
       active: true,
       step: 0,
@@ -3021,12 +3081,13 @@
     fieldCoach.reason = reason;
     UI.fieldCoach?.classList.add('hidden');
     delete document.body.dataset.fieldCoach;
+    clearFieldCoachFocusTarget();
     if (markSeen && saveData.fieldCoachSeen !== true) {
       saveData.fieldCoachSeen = true;
       saveJSON(SAVE_KEY, saveData);
     }
     if (reason === 'complete') showToast('첫 위상 균열 기록 · 과거와 현재가 같은 적을 열었습니다', 2600);
-    else if (reason === 'timeout') showToast('전술 코치 종료 · 교차 사격은 고급 전술 훈련에서 다시 연습할 수 있습니다', 2600);
+    else if (reason === 'timeout') showToast('전술 코치 일시 종료 · 다음 시간선에서 한 번 더 안내합니다', 2600);
     return true;
   }
 
@@ -3050,6 +3111,7 @@
       else if (input.isEchoPreviewing()) progress = 0.48;
       else progress = player.echoCooldown <= 0.05 ? 0.22 : 0.08;
     } else {
+      spawnFieldCoachFocusTarget();
       if (phaseRiftProcs > fieldCoach.startPhaseRifts) progress = 1;
       else if (arrays.enemies.some((enemy) => !enemy.dead && enemy.phaseRiftTime > 0)) progress = 0.88;
       else progress = Math.min(0.58, 0.18 + clamp(fieldCoach.stepElapsed / 24, 0, 1) * 0.4);
@@ -3063,7 +3125,7 @@
       else finishFieldCoach('complete', true);
       return;
     }
-    if (fieldCoach.elapsed >= FIELD_COACH_TIMEOUT) finishFieldCoach('timeout', true);
+    if (fieldCoach.elapsed >= FIELD_COACH_TIMEOUT) finishFieldCoach('timeout', false);
   }
 
   const tutorialSteps = [
@@ -5145,6 +5207,7 @@
     echoReportTimer = null;
     tutorial = null;
     fieldCoach = null;
+    clearFieldCoachFocusTarget();
     currentWave = null;
     UI.echoReport?.classList.add('hidden');
     UI.tutorialCoach?.classList.add('hidden');
@@ -7985,6 +8048,46 @@
     ctx.restore();
   }
 
+  function drawFieldCoachFocusMark(enemy, time) {
+    if (!enemy?.fieldCoachFocus || !fieldCoach?.active || fieldCoach.step !== 2) return;
+    const pulse = 0.5 + Math.sin(time * 5.6 + enemy.seed) * 0.5;
+    const radius = enemy.radius + 26 + pulse * 4;
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.62 + pulse * 0.16;
+    ctx.strokeStyle = '#ffe39a';
+    ctx.lineWidth = 2.4;
+    setGlow('#ffd166', 18);
+    ctx.setLineDash([10, 7]);
+    ctx.lineDashOffset = -time * 38;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.rotate(time * 0.55);
+    for (let i = 0; i < 4; i++) {
+      const angle = i * TAU / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * (radius - 8), Math.sin(angle) * (radius - 8));
+      ctx.lineTo(Math.cos(angle) * (radius + 8), Math.sin(angle) * (radius + 8));
+      ctx.stroke();
+    }
+    clearGlow();
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#ffe39a';
+    ctx.font = '950 11px ui-monospace, monospace';
+    setGlow('#ffd166', 9);
+    ctx.fillText('협공 표적', enemy.x, enemy.y - enemy.radius - 38);
+    clearGlow();
+    ctx.restore();
+  }
+
   function drawEnemy(enemy, time) {
     if (!visible(enemy.x, enemy.y, enemy.radius + 60)) return;
     const spawnDuration = enemy.type === 'boss' ? 1.5 : enemy.type === 'shard' ? 0.35 : 0.58;
@@ -8144,7 +8247,10 @@
     clearGlow();
     ctx.restore();
 
-    if (spawnProgress >= 0.9) drawPhaseRiftMark(enemy, time);
+    if (spawnProgress >= 0.9) {
+      drawFieldCoachFocusMark(enemy, time);
+      drawPhaseRiftMark(enemy, time);
+    }
 
     if (spawnProgress >= 0.9 && !enemy.trainingDummy && enemy.type !== 'boss') {
       let warningRatio = 0;
@@ -9350,6 +9456,7 @@
         },
         fieldCoachStatus: () => window.echoRiftStatus.fieldCoach,
         dismissFieldCoach: () => { finishFieldCoach('dismissed', true); return window.echoRiftStatus.fieldCoach; },
+        forceFieldCoachTimeout: () => { finishFieldCoach('timeout', false); return window.echoRiftStatus.fieldCoach; },
         activateEcho: () => { if (!player || gameState !== 'playing') return false; player.echoCooldown = 0; activateEcho(); return arrays.echoes.length > 0; },
         status: () => window.echoRiftStatus,
         lockChoice: (index = 0) => {

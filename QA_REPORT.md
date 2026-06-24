@@ -4,7 +4,7 @@
 
 ## 환경 한계
 
-이번 패치는 정적 파일 기반 브라우저 게임의 전투 렌더링 성능을 보강했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-7.0-render.mjs`의 렌더 계약/벤치 검사, `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`의 기존 회귀 검사를 수행합니다. 실제 모바일 터치 실기기, 물리 게임패드, 오디오 청감, 저사양 장시간 성능, 고주사율 모니터 체감 검사는 별도 수동 확인이 필요합니다.
+이번 패치는 정적 파일 기반 브라우저 게임의 전투 렌더링 성능과 첫 런 코치 안정성을 보강했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-7.0-render.mjs`의 렌더 계약/벤치 검사, `scripts/verify-first-run-coach.mjs`의 코치 행동 검사, `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`의 기존 회귀 검사를 수행합니다. 실제 모바일 터치 실기기, 물리 게임패드, 오디오 청감, 저사양 장시간 성능, 고주사율 모니터 체감 검사는 별도 수동 확인이 필요합니다.
 
 ## 실행한 자동 검사
 

@@ -61,6 +61,7 @@ function runStaticChecks() {
   check('field coach CSS exists', files.css.includes('.field-coach') && files.css.includes('body.choice-open') && files.css.includes('.field-coach-progress'));
   check('field coach save flag is normalized', files.game.includes('fieldCoachSeen: false') && files.game.includes('source.fieldCoachSeen === true'));
   check('field coach runtime status is exposed', files.game.includes('fieldCoach: getFieldCoachStatus()') && files.game.includes('startFieldCoachProbe'));
+  check('field coach exposes phase-rift payoff target', files.game.includes('fieldCoachFocusTarget') && files.game.includes('spawnFieldCoachFocusTarget'));
   check('field coach is normal-run scoped', files.game.includes('wantsFieldCoachAfterTutorial') && files.game.includes('!forceTutorial && !wantsTutorial'));
 }
 
@@ -86,6 +87,7 @@ async function inspectCoachLayout(page) {
     const fontSize = (selector) => Number.parseFloat(getComputedStyle(document.querySelector(selector)).fontSize) || 0;
     return {
       visible: !coach.classList.contains('hidden') && styles.display !== 'none' && styles.visibility !== 'hidden',
+      waveBannerVisible: !document.querySelector('#waveBanner')?.classList.contains('hidden'),
       rect: {
         left: Number(rect.left.toFixed(1)),
         top: Number(rect.top.toFixed(1)),
@@ -96,9 +98,11 @@ async function inspectCoachLayout(page) {
       },
       centerElements,
       fonts: {
+        signal: fontSize('#fieldCoachStepLabel'),
         title: fontSize('#fieldCoachTitle'),
         body: fontSize('#fieldCoachBody'),
         hint: fontSize('#fieldCoachHint'),
+        dismiss: fontSize('#fieldCoachDismiss'),
       },
       pointerEvents: styles.pointerEvents,
       dismissPointerEvents: getComputedStyle(document.querySelector('#fieldCoachDismiss')).pointerEvents,
@@ -128,6 +132,7 @@ async function runBehaviorProbe(page, baseUrl) {
   await page.waitForFunction(() => window.echoRiftStatus?.fieldCoach?.key === 'pair');
   const afterDeploy = await page.evaluate(() => window.echoRiftStatus);
   check('deploy step advances from real echo activation', afterDeploy.fieldCoach?.key === 'pair' && afterDeploy.echoRecorder?.activations >= 1, JSON.stringify(afterDeploy.fieldCoach));
+  check('pair step provides a visible focus target', afterDeploy.fieldCoach?.focusTarget?.active === true && afterDeploy.fieldCoach?.focusTarget?.enemyId, JSON.stringify(afterDeploy.fieldCoach));
 
   const target = await page.evaluate(() => window.__echoRiftQA.spawnPhaseRiftTarget(2400));
   await page.evaluate((id) => {
@@ -162,6 +167,23 @@ async function runDismissProbe(page, baseUrl) {
   check('coach can be dismissed and persisted', dismissed.fieldCoach.reason === 'dismissed' && dismissed.save.fieldCoachSeen === true, JSON.stringify(dismissed));
 }
 
+async function runTimeoutProbe(page, baseUrl) {
+  await waitForQa(page, baseUrl);
+  await startCoach(page);
+  await page.evaluate(() => window.__echoRiftQA.forceFieldCoachTimeout());
+  await page.waitForFunction(() => window.echoRiftStatus?.fieldCoach?.active === false);
+  const timedOut = await page.evaluate(() => ({
+    fieldCoach: window.echoRiftStatus.fieldCoach,
+    save: JSON.parse(localStorage.getItem('echoRiftSaveV2') || '{}'),
+  }));
+  check('coach timeout does not mark first-run lesson seen', timedOut.fieldCoach.reason === 'timeout' && timedOut.save.fieldCoachSeen !== true, JSON.stringify(timedOut));
+
+  await page.evaluate(() => window.__echoRiftQA.start());
+  await page.waitForTimeout(1200);
+  const restarted = await page.evaluate(() => window.echoRiftStatus.fieldCoach);
+  check('coach retries after timeout on the next normal run', restarted.active === true && restarted.key === 'record', JSON.stringify(restarted));
+}
+
 async function runScopeProbe(page, baseUrl) {
   await waitForQa(page, baseUrl);
   await page.evaluate(() => {
@@ -193,7 +215,8 @@ async function runLayoutChecks(browser, baseUrl) {
     check(`coach visible ${viewport.name}`, layout.visible, JSON.stringify(layout));
     check(`coach stays in viewport ${viewport.name}`, layout.rect.left >= -1 && layout.rect.top >= -1 && layout.rect.right <= viewport.width + 1 && layout.rect.bottom <= viewport.height + 1, JSON.stringify(layout.rect));
     check(`coach leaves playfield center clear ${viewport.name}`, !layout.centerElements.some((item) => String(item).includes('fieldCoach')), JSON.stringify(layout.centerElements));
-    check(`coach text readable ${viewport.name}`, layout.fonts.title >= 15 && layout.fonts.body >= 9.5 && layout.fonts.hint >= 9, JSON.stringify(layout.fonts));
+    check(`coach text readable ${viewport.name}`, layout.fonts.signal >= 11 && layout.fonts.title >= 16 && layout.fonts.body >= 11 && layout.fonts.hint >= 11 && layout.fonts.dismiss >= 11, JSON.stringify(layout.fonts));
+    check(`coach suppresses wave banner clutter ${viewport.name}`, layout.waveBannerVisible === false, JSON.stringify(layout));
     check(`coach does not intercept general aiming ${viewport.name}`, layout.pointerEvents === 'none' && layout.dismissPointerEvents === 'auto', JSON.stringify(layout));
     check(`browser console has no errors ${viewport.name}`, consoleErrors.length === 0, consoleErrors.join('\n'));
     await context.close();
@@ -213,6 +236,7 @@ try {
   page.on('pageerror', (err) => consoleErrors.push(err.message));
   await runBehaviorProbe(page, baseUrl);
   await runDismissProbe(page, baseUrl);
+  await runTimeoutProbe(page, baseUrl);
   await runScopeProbe(page, baseUrl);
   check('browser console has no errors behavior probes', consoleErrors.length === 0, consoleErrors.join('\n'));
   await context.close();

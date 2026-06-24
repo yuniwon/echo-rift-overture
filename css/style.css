@@ -588,7 +588,7 @@ body.reduced-motion #scanlines { opacity: .03; }body.reduced-motion *,body.reduc
 .field-coach { position: fixed; z-index: 28; right: max(18px,2vw); top: max(118px,13vh); width: min(390px,calc(100vw - 32px)); display: grid; gap: 8px; padding: 15px 16px 13px; border: 1px solid rgba(126,197,244,.22); border-radius: 10px; color: #eaf7ff; background: linear-gradient(145deg,rgba(13,23,49,.94),rgba(5,9,25,.93)); box-shadow: 0 22px 70px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.04); pointer-events: none; animation: field-coach-in 210ms var(--ease-out) both; }
 .field-coach::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.045; background:repeating-linear-gradient(90deg,transparent 0 28px,#62e9ff 29px 30px); mask-image:linear-gradient(to bottom,#000,transparent); }
 .field-coach > * { position: relative; }
-.field-coach-signal { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#68e9ff; font:900 calc(8px * var(--text-scale))/1 ui-monospace,monospace; letter-spacing:.12em; }
+.field-coach-signal { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#68e9ff; font:900 max(11px, calc(8px * var(--text-scale)))/1 ui-monospace,monospace; letter-spacing:.08em; }
 .field-coach-signal b { color:#78f3c0; font-variant-numeric:tabular-nums; }
 .field-coach h2 { margin: 1px 0 0; color:#f1fbff; font-size: max(20px, calc(17px * var(--text-scale))); line-height:1.16; letter-spacing:-.035em; }
 .field-coach p { margin: 0; color:#a7bbcb; font-size: max(13px, calc(10.8px * var(--text-scale))); line-height:1.5; word-break:keep-all; }
@@ -596,7 +596,7 @@ body.reduced-motion #scanlines { opacity: .03; }body.reduced-motion *,body.reduc
 .field-coach-progress i { display:block; width:0; height:100%; background:linear-gradient(90deg,#62e9ff,#b976ff,#ffd36c); box-shadow:0 0 11px rgba(98,233,255,.65); transition:width 120ms linear; }
 .field-coach-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .field-coach-footer span { color:#73899e; font-size:max(11px, calc(8.8px * var(--text-scale))); line-height:1.35; }
-.field-coach-footer button { flex:0 0 auto; min-height:30px; padding:5px 8px; border:1px solid rgba(255,255,255,.12); border-radius:6px; color:#8ea5b7; background:rgba(255,255,255,.035); font-size:max(10px, calc(7.8px * var(--text-scale))); font-weight:850; cursor:pointer; pointer-events:auto; }
+.field-coach-footer button { flex:0 0 auto; min-height:30px; padding:5px 8px; border:1px solid rgba(255,255,255,.12); border-radius:6px; color:#8ea5b7; background:rgba(255,255,255,.035); font-size:max(11px, calc(7.8px * var(--text-scale))); font-weight:850; cursor:pointer; pointer-events:auto; }
 .field-coach-footer button:hover,.field-coach-footer button:focus-visible { color:#effaff; border-color:rgba(98,233,255,.42); outline:none; }
 @keyframes field-coach-in { from { opacity:0; transform:translateY(8px) scale(.985); } }
 
@@ -618,9 +618,9 @@ body.reduced-motion #scanlines { opacity: .03; }body.reduced-motion *,body.reduc
   body.game-running #echoAbility { width:min(226px,60vw); min-width:0; padding:8px 9px 10px; grid-template-columns:30px minmax(0,1fr); background:rgba(5,10,27,.84); }
   body.game-running #echoAbility .ability-glyph { width:28px; height:28px; }
   body.game-running #echoAbility .ability-glyph svg { width:17px; height:17px; }
-  body.game-running #echoAbility .ability-copy b { font-size:11px; }
-  body.game-running #echoAbility .ability-state { font-size:9px; }
-  body.game-running #echoAbility .echo-recorder-head b { font-size:8px; }
+  body.game-running #echoAbility .ability-copy b { font-size:12px; }
+  body.game-running #echoAbility .ability-state { font-size:10px; }
+  body.game-running #echoAbility .echo-recorder-head b { font-size:10px; }
   body.game-running #echoAbility .echo-timeline { height:11px; gap:1px; }
   .echo-report { left:10px; right:10px; bottom:calc(184px + var(--safe-bottom)); width:auto; }
   .tutorial-coach { top:max(86px,10vh); padding:15px 16px 13px; }
@@ -660,7 +660,7 @@ body.reduced-motion #scanlines { opacity: .03; }body.reduced-motion *,body.reduc
 .ability-module.echo.locked .ability-state { color:#ffe6a2; }
 .ability-module.echo.locked .ability-glyph { animation:none; color:#e7b7ff; box-shadow:0 0 20px rgba(203,136,255,.38); }
 .touch-action.echo { overflow:visible; }
-.touch-action.echo span { position:absolute; left:50%; bottom:-22px; transform:translateX(-50%); color:#af8cd3; font:900 8px/1 ui-monospace,monospace; letter-spacing:.08em; white-space:nowrap; text-shadow:0 2px 8px #02030b; }
+.touch-action.echo span { position:absolute; left:50%; bottom:-22px; transform:translateX(-50%); color:#af8cd3; font:900 max(11px, calc(8px * var(--text-scale)))/1 ui-monospace,monospace; letter-spacing:.04em; white-space:nowrap; text-shadow:0 2px 8px #02030b; }
 .touch-action.echo.locked { color:#ffe09a; border-color:rgba(255,209,102,.82); background:rgba(77,47,112,.88); box-shadow:0 0 0 2px rgba(255,209,102,.1),0 0 30px rgba(183,103,255,.36); }
 .touch-action.echo.locked span { color:#ffe09a; }
 .echo-report.compact { width:auto; min-width:230px; grid-template-columns:auto; gap:3px; padding:10px 13px; }
@@ -681,7 +681,7 @@ body.reduced-motion #scanlines { opacity: .03; }body.reduced-motion *,body.reduc
   .echo-report:not(.compact) small { display:none; }
   .sync-success { padding:20px 18px; }
   .sync-success b { font-size:28px; }
-  .touch-action.echo span { bottom:-19px; font-size:7px; }
+  .touch-action.echo span { bottom:-20px; font-size:11px; }
 }
 /* Preserve the action colour under the current-time cursor. */
 .echo-timeline i.current { background:rgba(238,227,255,.16); }
@@ -715,11 +715,11 @@ body.touch-controls-visible .touch-controls { opacity:1; }
   .field-coach { left:6px; right:6px; top:82px; width:auto; padding:9px 10px 8px; border-radius:8px; }
   .field-coach-signal { gap:6px; }
   .field-coach h2 { margin:5px 0 0; font-size:16px; }
-  .field-coach p { font-size:10.5px; line-height:1.35; }
+  .field-coach p { font-size:11px; line-height:1.4; }
   .field-coach-progress { height:4px; }
   .field-coach-footer { margin-top:0; }
-  .field-coach-footer span { font-size:9px; line-height:1.25; }
-  .field-coach-footer button { min-height:26px; padding:4px 7px; }
+  .field-coach-footer span { font-size:11px; line-height:1.28; }
+  .field-coach-footer button { min-height:30px; padding:5px 7px; }
   .tutorial-signal { gap:6px; }
   .tutorial-device-badge { max-width:106px; overflow:hidden; text-overflow:ellipsis; }
   .tutorial-coach h2 { margin:7px 0 3px; font-size:17px; }
@@ -729,8 +729,8 @@ body.touch-controls-visible .touch-controls { opacity:1; }
   .tutorial-footer span { font-size:9px; line-height:1.25; }
   .tutorial-footer button { padding:5px 7px; }
   body.game-running #echoAbility { width:min(184px,58vw); padding:6px 7px 8px; }
-  body.game-running #echoAbility .ability-copy b { font-size:10px; }
-  body.game-running #echoAbility .echo-recorder-head b { font-size:7px; }
+  body.game-running #echoAbility .ability-copy b { font-size:11px; }
+  body.game-running #echoAbility .echo-recorder-head b { font-size:10px; }
   body.game-running.touch-controls-visible .ability-dock { bottom:calc(136px + var(--safe-bottom)); }
   .stick-zone { height:34vh; }
   .stick-base { width:88px; height:88px; bottom:8px; }
@@ -750,12 +750,12 @@ body.touch-controls-visible .touch-controls { opacity:1; }
   .resource-heading { font-size:8px; }
   .tutorial-coach { left:auto; right:8px; top:8px; width:min(430px,57vw); transform:none; padding:9px 11px 8px; border-radius:8px; }
   .field-coach { left:auto; right:8px; top:72px; width:min(360px,43vw); padding:8px 10px 7px; border-radius:8px; }
-  .field-coach-signal { font-size:9px; gap:7px; }
-  .field-coach h2 { margin:4px 0 0; font-size:15px; }
-  .field-coach p { font-size:9.5px; line-height:1.3; }
+  .field-coach-signal { font-size:11px; gap:7px; }
+  .field-coach h2 { margin:4px 0 0; font-size:16px; }
+  .field-coach p { font-size:11px; line-height:1.32; }
   .field-coach-progress { height:4px; }
   .field-coach-footer span { display:none; }
-  .field-coach-footer button { margin-left:auto; min-height:24px; padding:3px 7px; font-size:9px; }
+  .field-coach-footer button { margin-left:auto; min-height:30px; padding:5px 8px; font-size:11px; }
   .tutorial-signal { gap:7px; }
   .tutorial-coach h2 { margin:6px 0 2px; font-size:16px; }
   .tutorial-coach p { font-size:10px; line-height:1.32; }
@@ -769,9 +769,9 @@ body.touch-controls-visible .touch-controls { opacity:1; }
   body.game-running .ability-dock { display:flex!important; left:50%; right:auto; top:auto; bottom:calc(5px + var(--safe-bottom)); transform:translateX(-50%); }
   body.game-running #echoAbility { width:min(224px,35vw); min-width:190px; padding:5px 7px 7px; grid-template-columns:26px minmax(0,1fr); }
   body.game-running #echoAbility .ability-glyph { width:25px; height:25px; }
-  body.game-running #echoAbility .ability-copy b { font-size:9px; }
-  body.game-running #echoAbility .ability-state { font-size:8px; }
-  body.game-running #echoAbility .echo-recorder-head b { font-size:7px; }
+  body.game-running #echoAbility .ability-copy b { font-size:11px; }
+  body.game-running #echoAbility .ability-state { font-size:10px; }
+  body.game-running #echoAbility .echo-recorder-head b { font-size:10px; }
   body.game-running #echoAbility .echo-timeline { height:9px; }
   .stick-zone { bottom:2px; width:32vw; height:48vh; }
   .stick-base { width:78px; height:78px; bottom:4px; }
@@ -780,7 +780,7 @@ body.touch-controls-visible .touch-controls { opacity:1; }
   .touch-action svg { width:20px; height:20px; }
   .touch-action.dash { right:10px; bottom:calc(90px + var(--safe-bottom)); }
   .touch-action.echo { right:58px; bottom:calc(56px + var(--safe-bottom)); }
-  .touch-action.echo span { bottom:-14px; font-size:6px; }
+  .touch-action.echo span { bottom:-18px; font-size:11px; }
   .boss-hud { bottom:calc(55px + var(--safe-bottom)); width:min(430px,66vw); }
   .echo-report { left:50%; right:auto; bottom:calc(62px + var(--safe-bottom)); width:min(330px,48vw); transform:translateX(-50%); padding:8px 10px; }
   .echo-report b { font-size:12px; }
