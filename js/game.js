@@ -217,7 +217,10 @@
     graphicsMode: 'auto',
     autoQualityTier: 2,
     showPerf: false,
+    hudSize: 'normal',
+    hudOpacity: 0.92,
     hudMode: 'adaptive',
+    choiceDensity: 'balanced',
     damageNumbers: 'full',
     rarityPatterns: true,
     echoTrail: true,
@@ -233,7 +236,9 @@
   };
   const SETTING_ENUMS = {
     graphicsMode: ['auto', 'high', 'balanced', 'performance'],
+    hudSize: ['compact', 'normal', 'large'],
     hudMode: ['adaptive', 'compact', 'detailed'],
+    choiceDensity: ['focused', 'balanced', 'full'],
     damageNumbers: ['full', 'reduced', 'minimal'],
     echoControlMode: ['adaptive', 'hold', 'toggle', 'instant'],
     echoReportMode: ['adaptive', 'detailed', 'compact', 'sector'],
@@ -248,6 +253,7 @@
     uiVolume: [0, 1],
     uiScale: [0.9, 1.6],
     autoQualityTier: [0, 2, true],
+    hudOpacity: [0.68, 1],
     flashIntensity: [0, 1],
   };
 
@@ -847,10 +853,13 @@
     settings.sfxVolume = clamp(Number(settings.sfxVolume ?? defaultSettings.sfxVolume), 0, 1);
     settings.uiVolume = clamp(Number(settings.uiVolume ?? defaultSettings.uiVolume), 0, 1);
     settings.uiScale = clamp(Number(settings.uiScale) || defaultSettings.uiScale, 0.9, 1.6);
+    settings.hudOpacity = clamp(Number(settings.hudOpacity ?? defaultSettings.hudOpacity), 0.68, 1);
     settings.autoQualityTier = clamp(Math.floor(Number(settings.autoQualityTier ?? 2)), 0, 2);
     settings.flashIntensity = clamp(Number(settings.flashIntensity ?? 0.72), 0, 1);
     if (!['auto', 'high', 'balanced', 'performance'].includes(settings.graphicsMode)) settings.graphicsMode = 'auto';
+    if (!['compact', 'normal', 'large'].includes(settings.hudSize)) settings.hudSize = 'normal';
     if (!['adaptive', 'compact', 'detailed'].includes(settings.hudMode)) settings.hudMode = 'adaptive';
+    if (!['focused', 'balanced', 'full'].includes(settings.choiceDensity)) settings.choiceDensity = 'balanced';
     if (!['full', 'reduced', 'minimal'].includes(settings.damageNumbers)) settings.damageNumbers = 'full';
     if (!['adaptive', 'hold', 'toggle', 'instant'].includes(settings.echoControlMode)) settings.echoControlMode = 'adaptive';
     if (!['adaptive', 'detailed', 'compact', 'sector'].includes(settings.echoReportMode)) settings.echoReportMode = 'adaptive';
@@ -864,13 +873,16 @@
     settings.keyBindings = normalizeKeyBindingMap(settings.keyBindings);
 
     document.documentElement.style.setProperty('--text-scale', settings.uiScale.toFixed(2));
+    document.documentElement.style.setProperty('--hud-opacity', settings.hudOpacity.toFixed(2));
     document.documentElement.style.setProperty('--flash-opacity', settings.flashIntensity.toFixed(2));
     document.body.classList.toggle('reduced-motion', settings.reducedMotion);
     document.body.classList.toggle('high-contrast', settings.highContrast);
     document.body.classList.toggle('compact-hud', settings.hudMode === 'compact');
     document.body.classList.toggle('no-rarity-patterns', !settings.rarityPatterns);
     document.body.dataset.combatPalette = settings.combatPalette;
+    document.body.dataset.hudSize = settings.hudSize;
     document.body.dataset.hudMode = settings.hudMode;
+    document.body.dataset.choiceDensity = settings.choiceDensity;
     document.body.dataset.damageNumbers = settings.damageNumbers;
     document.body.dataset.quality = String(quality);
 
@@ -890,7 +902,11 @@
     $('#uiScale').value = settings.uiScale;
     $('#uiScaleValue').textContent = `${Math.round(settings.uiScale * 100)}%`;
     $('#graphicsMode').value = settings.graphicsMode;
+    if ($('#hudSize')) $('#hudSize').value = settings.hudSize;
+    if ($('#hudOpacity')) $('#hudOpacity').value = settings.hudOpacity;
+    if ($('#hudOpacityValue')) $('#hudOpacityValue').textContent = `${Math.round(settings.hudOpacity * 100)}%`;
     if ($('#hudMode')) $('#hudMode').value = settings.hudMode;
+    if ($('#choiceDensity')) $('#choiceDensity').value = settings.choiceDensity;
     if ($('#damageNumbersMode')) $('#damageNumbersMode').value = settings.damageNumbers;
     if ($('#echoControlMode')) $('#echoControlMode').value = settings.echoControlMode;
     if ($('#echoReportMode')) $('#echoReportMode').value = settings.echoReportMode;
@@ -8488,8 +8504,24 @@
     settings.autoFire = event.target.checked;
     saveJSON(SETTINGS_KEY, settings);
   });
+  $('#hudSize')?.addEventListener('change', (event) => {
+    settings.hudSize = event.target.value;
+    saveJSON(SETTINGS_KEY, settings);
+    applySettings();
+  });
+  $('#hudOpacity')?.addEventListener('input', (event) => {
+    settings.hudOpacity = clamp(Number(event.target.value), 0.68, 1);
+    $('#hudOpacityValue').textContent = `${Math.round(settings.hudOpacity * 100)}%`;
+    document.documentElement.style.setProperty('--hud-opacity', settings.hudOpacity.toFixed(2));
+    saveJSON(SETTINGS_KEY, settings);
+  });
   $('#hudMode')?.addEventListener('change', (event) => {
     settings.hudMode = event.target.value;
+    saveJSON(SETTINGS_KEY, settings);
+    applySettings();
+  });
+  $('#choiceDensity')?.addEventListener('change', (event) => {
+    settings.choiceDensity = event.target.value;
     saveJSON(SETTINGS_KEY, settings);
     applySettings();
   });
@@ -8856,6 +8888,14 @@
         fps: Number(measuredFps.toFixed(1)),
         quality,
         qualityMode: settings.graphicsMode,
+        settings: {
+          uiScale: Number(settings.uiScale.toFixed(2)),
+          hudSize: settings.hudSize,
+          hudOpacity: Number(settings.hudOpacity.toFixed(2)),
+          hudMode: settings.hudMode,
+          choiceDensity: settings.choiceDensity,
+          showPerf: Boolean(settings.showPerf),
+        },
         autoQualityTier: settings.autoQualityTier,
         autoQualityLocked,
         longFrameCount,

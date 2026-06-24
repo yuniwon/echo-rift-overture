@@ -57,6 +57,10 @@ function startServer() {
 
 function runStaticChecks() {
   check('cross-screen readability CSS marker exists', files.css.includes('PRISM cross-screen readability pass'));
+  check('HUD perception controls exist in settings markup', files.html.includes('id="hudSize"') && files.html.includes('id="hudOpacity"') && files.html.includes('id="choiceDensity"'));
+  check('new perception settings normalize through whitelist', files.game.includes('hudSize:') && files.game.includes('choiceDensity:') && files.game.includes('hudOpacity: [0.68, 1]'));
+  check('new perception settings use body data attributes', files.game.includes('dataset.hudSize') && files.game.includes('dataset.choiceDensity'));
+  check('HUD opacity is CSS variable driven', files.css.includes('--hud-opacity') && files.game.includes('--hud-opacity'));
   check('upgrade cards remain article containers', files.game.includes("document.createElement('article')") && files.game.includes('upgrade-select') && files.game.includes('upgrade-lock'));
   check('HUD roots remain present', files.html.includes('id="hud"') && files.html.includes('id="abilityHud"') && files.html.includes('id="perfHud"'));
   check('route readability pass remains present', files.css.includes('PRISM route readability pass'));
@@ -80,6 +84,34 @@ async function openUpgradeDraft(page, baseUrl) {
     );
   });
   await page.waitForFunction(() => window.echoRiftStatus?.state === 'upgrade' && document.querySelectorAll('.upgrade-card').length === 4);
+}
+
+async function checkSettingsControls(page, baseUrl) {
+  await waitForQa(page, baseUrl);
+  await page.locator('#settingsBtn').click();
+  await page.waitForFunction(() => !document.querySelector('#settingsScreen')?.classList.contains('hidden'));
+  return page.evaluate(() => {
+    const hudSize = document.querySelector('#hudSize');
+    const hudOpacity = document.querySelector('#hudOpacity');
+    const choiceDensity = document.querySelector('#choiceDensity');
+    if (!hudSize || !hudOpacity || !choiceDensity) return { missing: true };
+    hudSize.value = 'large';
+    hudSize.dispatchEvent(new Event('change', { bubbles: true }));
+    hudOpacity.value = '0.78';
+    hudOpacity.dispatchEvent(new Event('input', { bubbles: true }));
+    choiceDensity.value = 'focused';
+    choiceDensity.dispatchEvent(new Event('change', { bubbles: true }));
+    const stored = JSON.parse(localStorage.getItem('echoRiftSettingsV1') || '{}');
+    return {
+      missing: false,
+      hudSize: document.body.dataset.hudSize,
+      choiceDensity: document.body.dataset.choiceDensity,
+      hudOpacityCss: getComputedStyle(document.documentElement).getPropertyValue('--hud-opacity').trim(),
+      hudOpacityOutput: document.querySelector('#hudOpacityValue')?.textContent || '',
+      stored,
+      statusSettings: window.echoRiftStatus?.settings || null,
+    };
+  });
 }
 
 async function inspectUpgrade(page) {
@@ -257,6 +289,16 @@ async function runBrowserChecks() {
       const consoleErrors = [];
       page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
       page.on('pageerror', (err) => consoleErrors.push(err.message));
+
+      if (viewport.name === 'desktop-qhd') {
+        const settingsProbe = await checkSettingsControls(page, baseUrl);
+        check('settings expose new perception controls', !settingsProbe.missing, JSON.stringify(settingsProbe));
+        check('HUD size setting applies to body dataset', settingsProbe.hudSize === 'large', JSON.stringify(settingsProbe));
+        check('choice density setting applies to body dataset', settingsProbe.choiceDensity === 'focused', JSON.stringify(settingsProbe));
+        check('HUD opacity setting applies CSS variable', settingsProbe.hudOpacityCss === '0.78' && settingsProbe.hudOpacityOutput === '78%', JSON.stringify(settingsProbe));
+        check('new perception settings persist to localStorage', settingsProbe.stored?.hudSize === 'large' && settingsProbe.stored?.choiceDensity === 'focused' && Math.abs(settingsProbe.stored?.hudOpacity - 0.78) < 0.001, JSON.stringify(settingsProbe.stored));
+        check('runtime status exposes perception settings', settingsProbe.statusSettings?.hudSize === 'large' && settingsProbe.statusSettings?.choiceDensity === 'focused' && Math.abs(settingsProbe.statusSettings?.hudOpacity - 0.78) < 0.001, JSON.stringify(settingsProbe.statusSettings));
+      }
 
       await openUpgradeDraft(page, baseUrl);
       const upgrade = await inspectUpgrade(page);

@@ -794,6 +794,7 @@ body.boss-intro-active #touchControls .stick-zone,
 body.boss-intro-active #touchControls .touch-action { pointer-events:none !important; }
 
 /* PRISM cross-screen readability pass */
+:root { --hud-opacity: .92; }
 .upgrade-panel { width: min(1800px, calc(100vw - 80px)); min-height: 0; padding: max(28px,3vh) 0; }
 .upgrade-grid { gap: 16px; align-items: start; }
 .upgrade-card { min-height: 0; max-height: calc(100vh - 220px); padding: 22px; border-radius: 8px; overflow: hidden; }
@@ -854,7 +855,50 @@ body.boss-intro-active #touchControls .touch-action { pointer-events:none !impor
 .ability-module.echo { min-width: 390px; grid-template-columns: 42px minmax(0,1fr); }
 .echo-recorder-head span,
 .echo-recorder-head b { font-size: max(11px, calc(9.4px * var(--text-scale))); line-height: 1.2; }
-.perf-hud { width: 220px; max-width: calc(100vw - 36px); border-radius: 8px; font-size: max(12px, calc(10.2px * var(--text-scale))); white-space: pre-wrap; }
+.hud-module { background: linear-gradient(145deg, rgba(8,15,35,var(--hud-opacity)), rgba(5,9,25,var(--hud-opacity))); }
+.ability-module { background: rgba(6,13,31,var(--hud-opacity)); }
+.perf-hud { width: 220px; max-width: calc(100vw - 36px); border-radius: 8px; background: rgba(4,8,22,var(--hud-opacity)); font-size: max(12px, calc(10.2px * var(--text-scale))); white-space: pre-wrap; }
+
+body[data-hud-size="compact"] .hud { grid-template-columns: minmax(260px,320px) 1fr minmax(250px,320px); gap: 10px; }
+body[data-hud-size="compact"] .hud-vitals { grid-template-columns: 44px 1fr; padding: 8px 11px; }
+body[data-hud-size="compact"] .hud-pilot-mark { width: 40px; height: 40px; }
+body[data-hud-size="compact"] .hud-mission { min-width: 300px; padding: 9px 16px 10px; }
+body[data-hud-size="compact"] .mission-rule,
+body[data-hud-size="compact"] .route-text { display: none; }
+body[data-hud-size="compact"] .hud-telemetry { grid-template-columns: repeat(2,1fr); max-width: 300px; min-height: 66px; justify-self: end; }
+body[data-hud-size="compact"] .hud-telemetry > div:nth-child(3),
+body[data-hud-size="compact"] .hud-telemetry > div:nth-child(4) { display: none; }
+body[data-hud-size="compact"] .ability-module { min-width: 204px; padding: 10px 12px 12px; }
+body[data-hud-size="compact"] .ability-module.echo { min-width: 318px; }
+body[data-hud-size="compact"] .ability-glyph { width: 36px; height: 36px; }
+
+body[data-hud-size="large"] .hud { grid-template-columns: minmax(380px,470px) 1fr minmax(390px,470px); gap: 18px; }
+body[data-hud-size="large"] .hud-vitals { padding: 14px 17px; }
+body[data-hud-size="large"] .hud-pilot-mark { width: 56px; height: 56px; }
+body[data-hud-size="large"] .resource-heading,
+body[data-hud-size="large"] .mission-index,
+body[data-hud-size="large"] .mission-index b,
+body[data-hud-size="large"] .mission-rule,
+body[data-hud-size="large"] .route-text,
+body[data-hud-size="large"] .hud-telemetry span { font-size: max(13px, calc(11px * var(--text-scale))); }
+body[data-hud-size="large"] .resource-heading strong,
+body[data-hud-size="large"] .hud-telemetry strong { font-size: max(18px, calc(15px * var(--text-scale))); }
+body[data-hud-size="large"] .wave-name { font-size: max(20px, calc(17px * var(--text-scale))); }
+body[data-hud-size="large"] .ability-module { min-width: 260px; padding: 14px 16px 16px; }
+body[data-hud-size="large"] .ability-module.echo { min-width: 430px; }
+body[data-hud-size="large"] .ability-copy b { font-size: max(17px, calc(14px * var(--text-scale))); }
+body[data-hud-size="large"] .ability-state,
+body[data-hud-size="large"] .ability-key,
+body[data-hud-size="large"] .echo-recorder-head span,
+body[data-hud-size="large"] .echo-recorder-head b { font-size: max(12px, calc(10.2px * var(--text-scale))); }
+
+body[data-choice-density="focused"] .upgrade-analysis,
+body[data-choice-density="focused"] .upgrade-path small { display: none; }
+body[data-choice-density="focused"] .upgrade-detail { margin-top: 8px; }
+body[data-choice-density="focused"] .route-card-facts .route-effect.anomaly { display: none; }
+body[data-choice-density="focused"] .route-card-facts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+body[data-choice-density="full"] .upgrade-analysis > div,
+body[data-choice-density="full"] .route-card-facts .route-effect { background: rgba(255,255,255,.03); }
 
 @media (max-width: 1380px) {
   .upgrade-panel { width: min(1320px, calc(100vw - 48px)); }
