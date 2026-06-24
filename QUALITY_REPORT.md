@@ -1,14 +1,21 @@
 # ECHO RIFT Quality Loop Report
 
-## 현재 상태 — 7.0.2 PRISM FIELD
+## 현재 상태 — 7.0.3 PRISM FOCUS
 
-Iteration 3에서 전투 렌더링 성능 회복을 위해 hot path `ctx.shadowBlur` 글로우를 사전 렌더 글로우 스프라이트로 교체하고, 자동 품질 강등을 frame-time 기반으로 교정했다. 7.0.1 에셋 패스에서는 Kenney CC0 에셋의 작은 로컬 부분 집합을 사운드/시각 피드백 레이어로 추가했다. 7.0.2 FIELD 패스에서는 첫 일반 런의 초반 60초가 `기록하기 → 잔향 호출 → 같은 적 협공`으로 읽히도록 비차단 전투 코치를 추가했다. 현재 자동 검증 기준은 `scripts/verify-first-run-coach.mjs`, `scripts/verify-7.0-render.mjs`, `scripts/verify-asset-pack.mjs`, `scripts/verify-ui-readability.mjs`, `scripts/verify-route-layout.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+Iteration 3에서 전투 렌더링 성능 회복을 위해 hot path `ctx.shadowBlur` 글로우를 사전 렌더 글로우 스프라이트로 교체하고, 자동 품질 강등을 frame-time 기반으로 교정했다. 7.0.1 에셋 패스에서는 Kenney CC0 에셋의 작은 로컬 부분 집합을 사운드/시각 피드백 레이어로 추가했다. 7.0.2 FIELD 패스에서는 첫 일반 런의 초반 60초가 `기록하기 → 잔향 호출 → 같은 적 협공`으로 읽히도록 비차단 전투 코치를 추가했다. 7.0.3 FOCUS 패스에서는 협공 표적 표시, 시간 초과 재시도, 짧은 화면 가독성 하한, 구형 릴리스 게이트 정리를 추가했다. 현재 자동 검증 기준은 `scripts/verify-first-run-coach.mjs`, `scripts/verify-7.0-render.mjs`, `scripts/verify-asset-pack.mjs`, `scripts/verify-ui-readability.mjs`, `scripts/verify-route-layout.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+
+## 7.0.3 Focus Pass
+
+- 협공 표적: 필드 코치의 마지막 단계에서 노릴 적을 표시한다. 기존 적을 우선 사용하고, 없을 때만 보상/공격이 없는 연습 표적을 생성한다.
+- 시간 초과 정책: 성공 전 타임아웃은 `fieldCoachSeen`을 저장하지 않아 다음 일반 런에서 다시 안내한다. 완료와 수동 숨김은 저장된다.
+- 가독성: 320px대 세로와 667×375 짧은 가로에서 필드 코치 제목/본문/힌트/버튼/신호 글자가 11px 아래로 내려가지 않도록 검증한다.
+- 릴리스 게이트: `scripts/verify-6.9.mjs`는 삭제하지 않고 PRISM 7.0.x 메타데이터 허용 범위를 갱신했다.
 
 ## 7.0.2 Field Coach Pass
 
 - 대상: 첫 일반 런. 기본/고급 훈련, 선택 화면, 경로 화면, 보스 인트로에는 코치를 띄우지 않는다.
 - 완료 근거: REC 버퍼 사격 기록, 실제 잔향 호출, `phaseRiftProcs` 증가.
-- 저장: 성공, 숨김, 시간 초과 중 하나가 발생하면 `fieldCoachSeen`을 기록해 반복 노출을 막는다.
+- 저장: 성공 또는 숨김은 `fieldCoachSeen`을 기록해 반복 노출을 막는다. 성공 전 시간 초과는 다음 런에 재시도된다.
 - 검증: `scripts/verify-first-run-coach.mjs`가 Playwright로 행동 단계와 2048×1024, 390×844, 667×375 레이아웃을 확인한다.
 - 미확인 한계: 실제 신규 플레이어가 60초 안에 안내를 이해하는지, 물리 게임패드/터치 실기기에서의 체감, 장시간 플레이 중 코치 노출 타이밍은 수동 플레이테스트가 필요하다.
 

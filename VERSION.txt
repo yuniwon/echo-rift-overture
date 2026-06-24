@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 7.0.2
-Codename: PRISM FIELD
+Version 7.0.3
+Codename: PRISM FOCUS
 Build date: 2026-06-24
 Focus: first-run core feel. The first normal run now shows a concise non-blocking field coach for recording a combat-ready echo, deploying it, and pairing present/echo hits into a phase rift. Rendering, combat balance, tutorial step counts, and offline dependency boundaries remain unchanged.

@@ -92,7 +92,7 @@ async function waitForGame(page, baseUrl) {
 function assertReleaseMetadata() {
   const manifest = JSON.parse(files.manifest);
   check('GAME_VERSION is PRISM 7.0.x', /const GAME_VERSION = '7\.0\.\d+';/.test(files.game));
-  check('service worker cache is PRISM 7.0.x', /const CACHE_NAME = 'echo-rift-prism-v7\.0\.(?:0|1-assets|2-field)';/.test(files.sw));
+  check('service worker cache is PRISM 7.0.x', /const CACHE_NAME = 'echo-rift-prism-v7\.0\.(?:0|1-assets|2-field|3-focus)';/.test(files.sw));
   check('manifest remains player-facing', manifest.name === 'ECHO RIFT: OVERTURE' && /3초/.test(manifest.description), manifest.description);
   check('VERSION marks PRISM', /Version 7\.0\.\d+/.test(files.version) && files.version.includes('Codename: PRISM'));
   check('README marks PRISM', files.readme.includes('7.0') && files.readme.includes('PRISM'));
@@ -181,7 +181,7 @@ async function runBrowserChecks() {
         const qa = window.__echoRiftQA;
         qa.start();
         qa.skipTraining();
-        return qa.renderBenchmark({ enemyBullets: 160, particles: 70, frames: 45, seed: 700 });
+        return qa.renderBenchmark({ enemyBullets: 160, particles: 70, frames: 90, seed: 700 });
       });
       check(`render benchmark returns requested bullet count ${viewport.width}x${viewport.height}`, result?.enemyBullets === 160, JSON.stringify(result));
       check(`render benchmark returns requested particle count ${viewport.width}x${viewport.height}`, result?.particles === 70, JSON.stringify(result));
