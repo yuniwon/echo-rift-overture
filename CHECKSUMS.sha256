@@ -6,7 +6,7 @@ e95954647c02f4e2c18a92e3aa9887e55f7a4b8a6164c34c655e5b7d52f291b5  ./BASELINE_AUD
 17ff9dedfc53f6007453f17d92ebc6e16c5281b7765cf6ed6a75c0410945e245  ./codex-handoff/02_WORK_INSTRUCTIONS.md
 3ef6bab6fd05d3a8a39476e9d11faad207b94315ffa549e06fe4afe5b2758d84  ./codex-handoff/03_CODE_EXAMPLES.md
 83e5a916152818abe0d4d4c943f65b36bc203547d010a33d1a50e5d94cbd4565  ./codex-handoff/04_CODEX_PROMPT.md
-82fb0b26bde7487dc8400585696bee30ffac8a5ba3e0205a31aa3b4bd57ee562  ./css/style.css
+f4f5fa519622869e0fb579160a1da9acc243cd46cce46ba0b971f20a15f752cf  ./css/style.css
 d4d84e96426b5f8d55c3b2aab7d831a1234cdd0c3dc154fed96748ff9b3ba4c5  ./icons/icon-192.png
 503b9ac656554d9ee7bba2c2f5263142b35159919487d2f8998ae67da6193d17  ./icons/icon-512.png
 9f0c2df497bdc6fba8bc2899f515247da37dad8ca3a8b1b8e141918a96df31a6  ./icons/icon.svg
@@ -29,6 +29,7 @@ d7b3ad35a12245002eacc4976368533b7963cccca4ae5ee24a0444c23eaee4d4  ./QUALITY_REPO
 a1204b1ba55dde004ff42e121a61b93ba69e84b8e4c56c473d5008835d5e79e6  ./scripts/verify-6.9.mjs
 835f88e4e8902074c3456495ef4c19daf8d0af83106bf3cad8a027d91f489d61  ./scripts/verify-7.0-render.mjs
 041c3802bccd19f880f99498e8e91855059069e92c8d1dc24afd2064497251ec  ./scripts/verify-route-layout.mjs
+77b354624f4b433ab12c748f0829fa0f3cb94bf53e72bd3e85c6c9115062a887  ./scripts/verify-ui-readability.mjs
 c7947bba0660ddd0e917aac36c8943288777f10a941ef7f14be060c574749d73  ./START_HERE.txt
 3c7b9e87d3af8ed10413d47dffb629af405cdd43268c4f6f2f1e8b47e98108c5  ./start_mac_linux.sh
 180f0e5c71cd4f51fa7a6a106e9b9acc7c867e008e247d4dfe7b47ecdd937adf  ./start_windows.bat

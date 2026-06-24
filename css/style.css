@@ -435,7 +435,7 @@ body.high-contrast .result-panel { background: #050b1e; border-color: rgba(255,2
 .touch-controls { position: fixed; inset: 0; z-index: 26; pointer-events: none; }.stick-zone { position: absolute; bottom: calc(24px + var(--safe-bottom)); width: 38vw; height: 42vh; pointer-events: auto; touch-action: none; }.stick-zone.left{left:0}.stick-zone.right{right:0}.stick-base { position: absolute; left: 50%; bottom: 18px; width: 112px; height: 112px; transform: translateX(-50%); border: 1px solid rgba(126,215,255,.28); border-radius: 50%; background: radial-gradient(circle,rgba(76,129,171,.13),rgba(13,24,50,.25)); box-shadow: inset 0 0 25px rgba(75,205,255,.08); opacity: .68; }.stick-knob { position: absolute; left: 30px; top: 30px; width: 52px; height: 52px; border: 1px solid rgba(98,233,255,.55); border-radius: 50%; background: rgba(69,140,176,.22); box-shadow: 0 0 20px rgba(98,233,255,.2); }.touch-action { position: absolute; width: 60px; height: 60px; display: grid; place-items: center; border: 1px solid rgba(98,233,255,.48); border-radius: 50%; color: var(--cyan); background: rgba(9,21,43,.78); box-shadow: 0 0 24px rgba(98,233,255,.15); pointer-events: auto; touch-action: none; }.touch-action svg { width: 28px; height: 28px; }.touch-action.dash { right: 22px; bottom: calc(188px + var(--safe-bottom)); }.touch-action.echo { right: 91px; bottom: calc(145px + var(--safe-bottom)); color: #d29aff; border-color: rgba(202,111,255,.5); }.touch-action:active { transform: scale(.93); background: rgba(61,110,156,.65); }
 
 /* Runtime and accessibility states */
-body.choice-open #hud,body.choice-open #abilityHud,body.choice-open .boss-hud,body.choice-open .wave-banner { opacity: 0 !important; visibility: hidden !important; }
+body.choice-open #hud,body.choice-open #abilityHud,body.choice-open .boss-hud,body.choice-open .wave-banner,body.choice-open .tutorial-coach { opacity: 0 !important; visibility: hidden !important; }
 body.game-running #scanlines { opacity: .04; } body.game-running #nebulaOverlay { opacity: .56; }
 body[data-quality="0"] #scanlines,body[data-quality="0"] #nebulaOverlay { display: none; }
 body[data-quality="0"] .ability-module.ready .ability-glyph,body[data-quality="0"] .hud-vitals.critical { animation: none; }
@@ -792,3 +792,119 @@ body.reduced-motion.boss-materializing #bossHud #bossBarFill { animation:none; }
 
 body.boss-intro-active #touchControls .stick-zone,
 body.boss-intro-active #touchControls .touch-action { pointer-events:none !important; }
+
+/* PRISM cross-screen readability pass */
+.upgrade-panel { width: min(1800px, calc(100vw - 80px)); min-height: 0; padding: max(28px,3vh) 0; }
+.upgrade-grid { gap: 16px; align-items: start; }
+.upgrade-card { min-height: 0; max-height: calc(100vh - 220px); padding: 22px; border-radius: 8px; overflow: hidden; }
+.upgrade-card::after { left: 0; right: 0; }
+.upgrade-lock { min-width: 56px; min-height: 42px; height: auto; border-radius: 8px; font-size: max(12px, calc(10px * var(--text-scale))); letter-spacing: .04em; }
+.upgrade-lock svg { width: 17px; height: 17px; }
+.upgrade-rarity-row { align-items: flex-start; gap: 10px; padding-right: 70px; }
+.upgrade-rarity,
+.upgrade-family,
+.upgrade-badge,
+.upgrade-analysis span,
+.upgrade-level,
+.upgrade-path span,
+.upgrade-path small,
+.upgrade-select span,
+.upgrade-select kbd,
+.choice-footer { font-size: max(12px, calc(10.2px * var(--text-scale))); letter-spacing: .03em; }
+.upgrade-title-wrap h3 { font-size: max(25px, calc(22px * var(--text-scale))); line-height: 1.14; }
+.upgrade-flavor { font-size: max(13px, calc(11.2px * var(--text-scale))); line-height: 1.45; }
+.upgrade-effect { min-height: 78px; padding: 15px 16px; border-radius: 0 8px 8px 0; font-size: max(18px, calc(15.6px * var(--text-scale))); line-height: 1.45; }
+.upgrade-detail { min-height: 0; font-size: max(14px, calc(12px * var(--text-scale))); line-height: 1.55; }
+.upgrade-analysis { gap: 8px; margin-top: 12px; }
+.upgrade-analysis > div { padding: 10px 11px; border-radius: 8px; }
+.upgrade-analysis b,
+.upgrade-power,
+.upgrade-path b { font-size: max(14px, calc(12px * var(--text-scale))); line-height: 1.4; }
+.upgrade-path { padding: 10px 11px; border-radius: 8px; font-size: max(12px, calc(10.5px * var(--text-scale))); }
+.upgrade-card-footer { gap: 12px; padding-top: 14px; }
+.upgrade-select { min-width: 86px; min-height: 38px; border-radius: 8px; }
+.upgrade-select kbd { min-width: 26px; min-height: 24px; }
+.build-summary,
+.reroll-btn b,
+.reroll-btn small { font-size: max(13px, calc(11px * var(--text-scale))); line-height: 1.45; }
+.reroll-btn { min-height: 58px; border-radius: 8px; }
+
+.resource-heading { font-size: max(12px, calc(10.2px * var(--text-scale))); letter-spacing: .03em; }
+.resource-heading svg { width: 14px; height: 14px; }
+.resource-heading strong { font-size: max(16px, calc(13.6px * var(--text-scale))); line-height: 1; }
+.resource-track { height: 8px; }
+.resource-track.compact { height: 5px; }
+.hud-mission { min-width: 420px; padding: 12px 26px 13px; border-radius: 8px; }
+.mission-index,
+.mission-index b,
+.mission-rule,
+.route-text { font-size: max(12px, calc(10.2px * var(--text-scale))); letter-spacing: .06em; }
+.wave-name { font-size: max(18px, calc(15.5px * var(--text-scale))); line-height: 1.15; }
+.hud-telemetry { min-height: 84px; padding: 12px; border-radius: 8px; }
+.hud-telemetry > div { column-gap: 8px; padding: 0 10px; }
+.hud-telemetry svg { width: 17px; height: 17px; }
+.hud-telemetry span { font-size: max(12px, calc(10.1px * var(--text-scale))); letter-spacing: .04em; }
+.hud-telemetry strong { font-size: max(16px, calc(13.6px * var(--text-scale))); line-height: 1.15; }
+.ability-module { min-width: 230px; grid-template-columns: 42px 1fr auto; gap: 11px; padding: 12px 14px 14px; border-radius: 8px; }
+.ability-glyph { width: 40px; height: 40px; }
+.ability-glyph svg { width: 23px; height: 23px; }
+.ability-copy b { font-size: max(15px, calc(12.8px * var(--text-scale))); line-height: 1.2; }
+.ability-state,
+.ability-key { font-size: max(11px, calc(9.4px * var(--text-scale))); line-height: 1.2; }
+.ability-module.echo { min-width: 390px; grid-template-columns: 42px minmax(0,1fr); }
+.echo-recorder-head span,
+.echo-recorder-head b { font-size: max(11px, calc(9.4px * var(--text-scale))); line-height: 1.2; }
+.perf-hud { width: 220px; max-width: calc(100vw - 36px); border-radius: 8px; font-size: max(12px, calc(10.2px * var(--text-scale))); white-space: pre-wrap; }
+
+@media (max-width: 1380px) {
+  .upgrade-panel { width: min(1320px, calc(100vw - 48px)); }
+  .upgrade-grid { gap: 14px; }
+  .upgrade-card { max-height: none; padding: 20px; }
+  .hud { grid-template-columns: minmax(310px,360px) 1fr minmax(330px,380px); }
+  .hud-mission { min-width: 340px; padding-inline: 18px; }
+  .hud-telemetry > div { padding: 0 7px; }
+  .ability-module.echo { min-width: 360px; }
+}
+
+@media (max-width: 760px) {
+  .upgrade-panel { width: 100%; padding: 18px 0; }
+  .upgrade-card { flex-basis: 86vw; padding: 18px; }
+  .upgrade-rarity-row { padding-right: 62px; }
+  .upgrade-title-wrap h3 { font-size: max(22px, calc(20px * var(--text-scale))); }
+  .upgrade-flavor,
+  .upgrade-detail { font-size: max(13px, calc(12px * var(--text-scale))); }
+  .upgrade-effect { min-height: 74px; padding: 13px 14px; font-size: max(16px, calc(14.5px * var(--text-scale))); }
+  .upgrade-rarity,
+  .upgrade-family,
+  .upgrade-badge,
+  .upgrade-analysis span,
+  .upgrade-level,
+  .upgrade-path span,
+  .upgrade-path small,
+  .upgrade-select span,
+  .upgrade-select kbd,
+  .choice-footer { font-size: max(11px, calc(10px * var(--text-scale))); }
+  .build-summary,
+  .reroll-btn b,
+  .reroll-btn small { font-size: max(12px, calc(11px * var(--text-scale))); }
+  .resource-heading { font-size: 9.5px; }
+  .resource-heading strong { font-size: 12px; }
+  .ability-key,
+  .ability-state { font-size: 9px; }
+  body.game-running #echoAbility .ability-copy b { font-size: 11px; }
+  body.game-running #echoAbility .ability-state,
+  body.game-running #echoAbility .echo-recorder-head b,
+  body.game-running #echoAbility .echo-recorder-head span { font-size: 9px; }
+  .perf-hud { display: none !important; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 920px) {
+  .resource-heading { font-size: 9.5px; }
+  .resource-heading strong { font-size: 12px; }
+  body.game-running #echoAbility .ability-copy b { font-size: 9.5px; }
+  body.game-running #echoAbility .ability-state,
+  body.game-running #echoAbility .ability-key,
+  body.game-running #echoAbility .echo-recorder-head b,
+  body.game-running #echoAbility .echo-recorder-head span { font-size: 9px; }
+  .perf-hud { display: none !important; }
+}
