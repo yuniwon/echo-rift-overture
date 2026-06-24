@@ -92,7 +92,7 @@ async function waitForGame(page, baseUrl) {
 function assertReleaseMetadata() {
   const manifest = JSON.parse(files.manifest);
   check('GAME_VERSION is 7.0.0', files.game.includes("const GAME_VERSION = '7.0.0';"));
-  check('service worker cache is PRISM 7.0.0', files.sw.includes("const CACHE_NAME = 'echo-rift-prism-v7.0.0';"));
+  check('service worker cache is PRISM 7.0.x', /const CACHE_NAME = 'echo-rift-prism-v7\.0\.(?:0|1-assets)';/.test(files.sw));
   check('manifest remains player-facing', manifest.name === 'ECHO RIFT: OVERTURE' && /3초/.test(manifest.description), manifest.description);
   check('VERSION marks PRISM', files.version.includes('Version 7.0.0') && files.version.includes('Codename: PRISM'));
   check('README marks PRISM', files.readme.includes('7.0') && files.readme.includes('PRISM'));

@@ -108,6 +108,19 @@
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
   const GAME_VERSION = '7.0.0';
+  const THIRD_PARTY_AUDIO_ASSETS = Object.freeze({
+    uiHover: './assets/audio/kenney-ui/ui-hover.ogg',
+    uiSelect: './assets/audio/kenney-ui/ui-select.ogg',
+    uiSwitch: './assets/audio/kenney-ui/ui-switch.ogg',
+    laserSmall: './assets/audio/kenney-sci-fi/laser-small.ogg',
+    forceField: './assets/audio/kenney-sci-fi/force-field.ogg',
+    explosionCrunch: './assets/audio/kenney-sci-fi/explosion-crunch.ogg',
+    lowBoom: './assets/audio/kenney-sci-fi/low-boom.ogg',
+  });
+  const THIRD_PARTY_IMAGE_ASSETS = Object.freeze({
+    impactCloud: './assets/images/kenney-space/impact-cloud.png',
+    riftFlare: './assets/images/kenney-space/rift-flare.png',
+  });
   const MAX_ENEMY_BULLETS = 680;
   const MAX_PLAYER_BULLETS = 360;
   const WORLD_UNITS_PER_METER = 10;
@@ -954,7 +967,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Procedural audio engine (layered synthesis, dynamic mix, no external assets)
+  // Procedural audio engine plus small local CC0 sample layer.
   // ---------------------------------------------------------------------------
   class AudioEngine {
     constructor() {
@@ -974,16 +987,20 @@
       this.musicTimer = null;
       this.nextNoteTime = 0;
       this.musicStep = 0;
-      this.lastShotAt = 0;
-      this.lastHitAt = 0;
-      this.lastPickupAt = 0;
-      this.lastUiHoverAt = 0;
-      this.lastUiSelectAt = 0;
+      this.lastShotAt = -999;
+      this.lastHitAt = -999;
+      this.lastPickupAt = -999;
+      this.lastUiHoverAt = -999;
+      this.lastUiSelectAt = -999;
       this.gameActive = false;
       this.enabled = true;
       this.unlocked = false;
       this.voiceCount = 0;
       this.debugEvents = Object.create(null);
+      this.sampleManifest = THIRD_PARTY_AUDIO_ASSETS;
+      this.sampleBuffers = new Map();
+      this.sampleErrors = Object.create(null);
+      this.sampleLoadPromise = null;
     }
 
     mark(name) {
@@ -1040,6 +1057,7 @@
 
         this.buildNoiseBuffer();
         this.buildImpulseResponse();
+        this.loadSamples();
         this.applyVolume();
         this.startMusic();
         if (this.ctx.state === 'suspended') {
@@ -1052,6 +1070,28 @@
         this.enabled = false;
         return false;
       }
+    }
+
+    loadSamples() {
+      if (this.sampleLoadPromise) return this.sampleLoadPromise;
+      if (!this.ctx || !this.enabled || typeof fetch !== 'function') {
+        this.sampleLoadPromise = Promise.resolve(false);
+        return this.sampleLoadPromise;
+      }
+      this.sampleLoadPromise = Promise.all(Object.entries(this.sampleManifest).map(async ([name, url]) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`${response.status} ${response.statusText}`.trim());
+          const data = await response.arrayBuffer();
+          const buffer = await this.ctx.decodeAudioData(data.slice(0));
+          this.sampleBuffers.set(name, buffer);
+          return true;
+        } catch (err) {
+          this.sampleErrors[name] = String(err?.message || err);
+          return false;
+        }
+      })).then((results) => results.some(Boolean));
+      return this.sampleLoadPromise;
     }
 
     buildNoiseBuffer() {
@@ -1098,6 +1138,44 @@
         send.gain.value = clamp(reverb, 0, 0.8);
         node.connect(send).connect(this.reverbInput);
       }
+    }
+
+    playSample(name, {
+      volume = 0.18,
+      rate = 1,
+      pan = 0,
+      when = 0,
+      destination = 'sfx',
+      reverb = 0,
+    } = {}) {
+      if (!this.ctx || !this.enabled || this.normalizedSetting('master', 0.78) <= 0) return false;
+      const buffer = this.sampleBuffers.get(name);
+      if (!buffer) {
+        this.loadSamples();
+        return false;
+      }
+      const start = this.ctx.currentTime + Math.max(0, when);
+      const source = this.ctx.createBufferSource();
+      const gain = this.ctx.createGain();
+      const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+      source.buffer = buffer;
+      source.playbackRate.setValueAtTime(clamp(Number(rate) || 1, 0.35, 2.4), start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), start + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + Math.max(0.04, buffer.duration / Math.max(0.35, rate)));
+      source.connect(gain);
+      if (panner) {
+        panner.pan.value = clamp(pan, -1, 1);
+        gain.connect(panner);
+        this.connectVoice(panner, destination, reverb);
+      } else {
+        this.connectVoice(gain, destination, reverb);
+      }
+      source.start(start);
+      this.voiceCount++;
+      source.addEventListener('ended', () => { this.voiceCount = Math.max(0, this.voiceCount - 1); }, { once: true });
+      this.mark(`sample:${name}`);
+      return true;
     }
 
     normalizedSetting(name, fallback) {
@@ -1255,6 +1333,7 @@
       if (!this.ctx || this.ctx.currentTime - this.lastShotAt < 0.042) return;
       this.lastShotAt = this.ctx.currentTime;
       const pan = this.spatialPan(x);
+      if (this.voiceCount < 64) this.playSample('laserSmall', { volume: echo ? 0.026 : 0.035, rate: echo ? 1.18 : 0.94, pan, reverb: echo ? 0.08 : 0.025 });
       this.tone({
         frequency: echo ? 610 : 330,
         endFrequency: echo ? 1040 : 145,
@@ -1281,6 +1360,7 @@
 
     kill(x, heavy = false) {
       const pan = this.spatialPan(x);
+      this.playSample('explosionCrunch', { volume: heavy ? 0.16 : 0.055, rate: heavy ? 0.76 : 1.22, pan, reverb: heavy ? 0.16 : 0.05 });
       this.noise({ duration: heavy ? 0.38 : 0.17, volume: heavy ? 0.17 : 0.068, frequency: heavy ? 410 : 980, endFrequency: heavy ? 110 : 320, pan, q: heavy ? 0.65 : 0.9, reverb: heavy ? 0.22 : 0.07 });
       this.tone({ frequency: heavy ? 145 : 285, endFrequency: heavy ? 38 : 78, duration: heavy ? 0.48 : 0.22, type: 'sawtooth', volume: heavy ? 0.16 : 0.066, pan, filterFrequency: heavy ? 760 : 1700, reverb: heavy ? 0.2 : 0.055 });
       if (heavy) {
@@ -1291,6 +1371,7 @@
     }
 
     dash() {
+      this.playSample('forceField', { volume: 0.045, rate: 1.34, reverb: 0.08 });
       this.noise({ duration: 0.18, volume: 0.082, frequency: 660, endFrequency: 4200, filterType: 'bandpass', q: 0.58, reverb: 0.09 });
       this.tone({ frequency: 150, endFrequency: 920, duration: 0.17, type: 'sawtooth', volume: 0.076, filterFrequency: 2600, reverb: 0.06 });
       this.mark('dash');
@@ -1316,6 +1397,7 @@
 
     phaseRift(x) {
       const pan = this.spatialPan(x);
+      this.playSample('forceField', { volume: 0.16, rate: 0.78, pan, reverb: 0.2 });
       this.tone({ frequency: 188, endFrequency: 76, duration: 0.34, type: 'sawtooth', volume: 0.085, pan, filterFrequency: 1450, q: 0.75, reverb: 0.18 });
       [0, 0.045, 0.09].forEach((when, index) => this.tone({
         frequency: [370, 555, 740][index],
@@ -1372,6 +1454,7 @@
     }
 
     reroll() {
+      this.playSample('uiSwitch', { volume: 0.2, rate: 0.86, destination: 'ui', reverb: 0.1 });
       [0, 0.07, 0.14].forEach((when, i) => this.tone({ frequency: 720 - i * 110, endFrequency: 250 + i * 80, duration: 0.28, type: 'triangle', volume: 0.055, pan: i === 0 ? -0.35 : i === 2 ? 0.35 : 0, when, destination: 'ui', reverb: 0.19 }));
       this.noise({ duration: 0.34, volume: 0.04, frequency: 4900, endFrequency: 780, filterType: 'bandpass', q: 0.45, destination: 'ui', reverb: 0.16 });
       this.mark('reroll');
@@ -1380,6 +1463,7 @@
     routeSelect(risk = '') {
       const dangerous = /높음|극/.test(String(risk));
       const base = dangerous ? 180 : 240;
+      this.playSample('uiSwitch', { volume: dangerous ? 0.22 : 0.16, rate: dangerous ? 0.7 : 1, destination: 'ui', reverb: 0.14 });
       [0, 0.085, 0.17].forEach((when, i) => this.tone({ frequency: base * [1, 1.5, 2][i], endFrequency: base * [1.08, 1.62, 2.16][i], duration: 0.36, type: dangerous ? 'sawtooth' : 'triangle', volume: 0.07, when, destination: 'ui', filterFrequency: dangerous ? 1500 : 3200, reverb: 0.2 }));
       this.duckMusic(0.58, 0.38);
       this.mark('routeSelect');
@@ -1394,12 +1478,14 @@
     }
 
     shieldBreak() {
+      this.playSample('forceField', { volume: 0.13, rate: 0.62, reverb: 0.24 });
       this.noise({ duration: 0.42, volume: 0.13, frequency: 4600, endFrequency: 520, q: 0.5, reverb: 0.24 });
       [0, 0.045].forEach((when, i) => this.tone({ frequency: 1120 - i * 220, endFrequency: 170 + i * 45, duration: 0.38, type: 'triangle', volume: 0.09, when, pan: i ? 0.35 : -0.35, reverb: 0.22 }));
       this.mark('shieldBreak');
     }
 
     bossPulse() {
+      this.playSample('lowBoom', { volume: 0.2, rate: 0.72, reverb: 0.12 });
       this.tone({ frequency: 76, endFrequency: 36, duration: 0.68, type: 'sawtooth', volume: 0.17, filterFrequency: 560, reverb: 0.12 });
       this.tone({ frequency: 38, endFrequency: 28, duration: 0.75, type: 'sine', volume: 0.18 });
       this.noise({ duration: 0.45, volume: 0.09, frequency: 320, endFrequency: 120, q: 0.55, reverb: 0.08 });
@@ -1436,6 +1522,7 @@
     uiHover() {
       if (!this.ctx || this.ctx.currentTime - this.lastUiHoverAt < 0.055) return;
       this.lastUiHoverAt = this.ctx.currentTime;
+      this.playSample('uiHover', { volume: 0.15, rate: 1.06, destination: 'ui' });
       this.tone({ frequency: 690, endFrequency: 760, duration: 0.045, type: 'sine', volume: 0.022, destination: 'ui', reverb: 0.025 });
       this.mark('uiHover');
     }
@@ -1443,12 +1530,14 @@
     uiSelect() {
       if (!this.ctx || this.ctx.currentTime - this.lastUiSelectAt < 0.06) return;
       this.lastUiSelectAt = this.ctx.currentTime;
+      this.playSample('uiSelect', { volume: 0.19, rate: 0.98, destination: 'ui', reverb: 0.04 });
       this.tone({ frequency: 310, endFrequency: 620, duration: 0.095, type: 'triangle', volume: 0.055, destination: 'ui', reverb: 0.08 });
       this.noise({ duration: 0.04, volume: 0.024, frequency: 2600, endFrequency: 4100, filterType: 'highpass', q: 0.45, destination: 'ui' });
       this.mark('uiSelect');
     }
 
     uiBack() {
+      this.playSample('uiSelect', { volume: 0.13, rate: 0.76, destination: 'ui', reverb: 0.05 });
       this.tone({ frequency: 520, endFrequency: 260, duration: 0.12, type: 'triangle', volume: 0.05, destination: 'ui', reverb: 0.07 });
       this.mark('uiBack');
     }
@@ -1457,6 +1546,7 @@
       this.uiSelect();
       window.setTimeout(() => this.draftReveal(3), 160);
       window.setTimeout(() => {
+        this.playSample('forceField', { volume: 0.12, rate: 0.92, destination: 'sfx', reverb: 0.12 });
         this.noise({ duration: 0.16, volume: 0.095, frequency: 1500, endFrequency: 340, q: 0.7, destination: 'sfx', reverb: 0.12 });
         this.tone({ frequency: 130, endFrequency: 58, duration: 0.24, type: 'sawtooth', volume: 0.11, destination: 'sfx', filterFrequency: 980 });
       }, 520);
@@ -1597,6 +1687,12 @@
         music: this.musicGain ? Number(this.musicGain.gain.value.toFixed(3)) : 0,
         sfx: this.sfxGain ? Number(this.sfxGain.gain.value.toFixed(3)) : 0,
         ui: this.uiGain ? Number(this.uiGain.gain.value.toFixed(3)) : 0,
+        samples: {
+          expected: Object.keys(this.sampleManifest).length,
+          loaded: this.sampleBuffers.size,
+          ready: this.sampleBuffers.size === Object.keys(this.sampleManifest).length,
+          errors: { ...this.sampleErrors },
+        },
         events: { ...this.debugEvents },
       });
     }
@@ -2402,7 +2498,16 @@
   const aoeScratch = [];
   const chainScratch = [];
   const renderGroups = { player: new Map(), enemy: new Map(), particles: new Map() };
-  const renderCache = { background: null, vignettePlay: null, vignetteMenu: null, nebulaSprites: new Map(), glowBase: null, glowSprites: new Map() };
+  const renderCache = {
+    background: null,
+    vignettePlay: null,
+    vignetteMenu: null,
+    nebulaSprites: new Map(),
+    glowBase: null,
+    glowSprites: new Map(),
+    assetImages: new Map(),
+    assetImageStatus: Object.create(null),
+  };
 
   function clearRenderGroups(map) {
     for (const group of map.values()) group.length = 0;
@@ -2424,6 +2529,22 @@
     g.fillStyle = gradient;
     g.fillRect(0, 0, 256, 256);
     return sprite;
+  }
+
+  function loadImageAsset(name, src) {
+    if (renderCache.assetImages.has(name)) return renderCache.assetImages.get(name);
+    const image = new Image();
+    renderCache.assetImageStatus[name] = 'loading';
+    image.decoding = 'async';
+    image.onload = () => { renderCache.assetImageStatus[name] = 'loaded'; };
+    image.onerror = () => { renderCache.assetImageStatus[name] = 'error'; };
+    image.src = src;
+    renderCache.assetImages.set(name, image);
+    return image;
+  }
+
+  function loadVisualAssets() {
+    for (const [name, src] of Object.entries(THIRD_PARTY_IMAGE_ASSETS)) loadImageAsset(name, src);
   }
 
   function rebuildRenderCache() {
@@ -5236,6 +5357,41 @@
     }
   }
 
+  function spawnAssetParticle(x, y, assetName, options = {}) {
+    if (settings.reducedMotion || quality === 0) return;
+    const image = renderCache.assetImages.get(assetName);
+    if (!image || renderCache.assetImageStatus[assetName] !== 'loaded') return;
+    spawnParticle(x, y, {
+      shape: `asset:${assetName}`,
+      color: options.color || '#ffffff',
+      alpha: options.alpha ?? 0.28,
+      size: options.size ?? 48,
+      endSize: options.endSize ?? ((options.size ?? 48) * 1.35),
+      life: options.life ?? 0.45,
+      angle: options.angle ?? rand(0, TAU),
+      speed: options.speed ?? rand(4, 24),
+      drag: options.drag ?? 2.2,
+      rotation: options.rotation ?? rand(0, TAU),
+      spin: options.spin ?? rand(-0.9, 0.9),
+      glow: 0,
+    });
+  }
+
+  function spawnImpactAssetBurst(x, y, color = '#dffbff', heavy = false) {
+    if (settings.reducedMotion || quality === 0) return;
+    const count = heavy && quality === 2 ? 3 : 1;
+    for (let i = 0; i < count; i++) {
+      spawnAssetParticle(x + rand(-10, 10), y + rand(-10, 10), 'impactCloud', {
+        color,
+        alpha: heavy ? 0.46 : 0.32,
+        size: heavy ? rand(58, 90) : rand(30, 52),
+        endSize: heavy ? rand(96, 140) : rand(54, 78),
+        life: heavy ? rand(0.52, 0.78) : rand(0.28, 0.46),
+        speed: heavy ? rand(14, 58) : rand(4, 24),
+      });
+    }
+  }
+
   function createShockwave(x, y, color = '#5ce8ff', radius = 100, life = 0.45, width = 2) {
     arrays.shockwaves.push({ x, y, color, radius: 0, maxRadius: radius, life, maxLife: life, width });
   }
@@ -6234,6 +6390,7 @@
           chainFromEnemy(enemy, hitDamage * player.chainDamageRatio, player.chainJumps + Math.floor((player.upgradeLevels.chain || 0) / 2), { fromEcho: b.fromEcho, echoStat: b.echoStat });
         }
         burstParticles(b.x, b.y, b.color, hitCrit ? 9 : 4, 25, hitCrit ? 170 : 100, 1, hitCrit ? 4 : 2.5);
+        if (hitCrit || chance(0.18)) spawnImpactAssetBurst(b.x, b.y, b.color, hitCrit);
         audio.hit(enemy.x);
 
         if (b.pierceLeft > 0) {
@@ -6284,6 +6441,15 @@
     createShockwave(enemy.x, enemy.y, '#b978ff', enemy.radius + 62, 0.34, 2.2);
     burstParticles(enemy.x, enemy.y, '#ffd166', quality === 0 ? 10 : 18, 32, 150, 1.5, 4.2);
     burstParticles(enemy.x, enemy.y, '#b978ff', quality === 0 ? 8 : 14, 24, 120, 1.2, 3.8);
+    spawnAssetParticle(enemy.x, enemy.y, 'riftFlare', {
+      color: '#ffd166',
+      alpha: 0.36,
+      size: enemy.radius + 58,
+      endSize: enemy.radius + 94,
+      life: 0.52,
+      speed: 4,
+      spin: rand(-0.4, 0.4),
+    });
     createFloater(enemy.x, enemy.y - enemy.radius - 16, 'PHASE RIFT', '#ffe39a', 14);
     audio.phaseRift(enemy.x);
     input.rumble(0.26, 72);
@@ -6429,6 +6595,7 @@
     const heavy = enemy.type === 'boss' || enemy.type === 'splitter' || enemy.elite;
     const deathColor = enemy.type === 'boss' ? '#ff64d4' : enemy.elite ? enemy.eliteColor : enemy.type === 'splitter' ? '#7ff0ac' : '#ff668f';
     burstParticles(enemy.x, enemy.y, deathColor, enemy.type === 'boss' ? 140 : heavy ? 38 : 15, 40, enemy.type === 'boss' ? 440 : 230, 1.5, enemy.type === 'boss' ? 12 : 6);
+    spawnImpactAssetBurst(enemy.x, enemy.y, deathColor, heavy);
     createShockwave(enemy.x, enemy.y, deathColor, enemy.type === 'boss' ? 560 : enemy.elite ? 210 : heavy ? 180 : 85, enemy.type === 'boss' ? 1.4 : 0.55, enemy.type === 'boss' ? 7 : 3);
     audio.kill(enemy.x, heavy);
 
@@ -8132,7 +8299,23 @@
           drawGlowSprite(p.x, p.y, Math.max(size, p.glow * 0.45), sample.color, sample.alpha * t * 0.3);
         }
       }
-      if (sample.shape === 'line') {
+      if (sample.shape.startsWith('asset:')) {
+        const assetName = sample.shape.slice(6);
+        const image = renderCache.assetImages.get(assetName);
+        if (image && renderCache.assetImageStatus[assetName] === 'loaded') {
+          for (const p of group) {
+            const t = clamp(p.life / p.maxLife, 0, 1);
+            const size = Math.max(2, lerp(p.endSize, p.size, t));
+            drawGlowSprite(p.x, p.y, size * 0.24, p.color, p.alpha * t * 0.22);
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation);
+            ctx.globalAlpha = Math.min(0.78, p.alpha * t * 1.35);
+            ctx.drawImage(image, -size / 2, -size / 2, size, size);
+            ctx.restore();
+          }
+        }
+      } else if (sample.shape === 'line') {
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         for (const p of group) { ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-p.vx*0.045,p.y-p.vy*0.045); }
@@ -8828,6 +9011,7 @@
   // Read-only diagnostics make the offline build verifiable without exposing mutable state.
   Object.defineProperty(window, 'echoRiftStatus', {
     get() {
+      const audioStatus = audio.status();
       return Object.freeze({
         state: gameState,
         score: Math.floor(score),
@@ -8969,7 +9153,15 @@
           linkedPhaseRifts: arrays.enemies.filter((enemy) => !enemy.dead && enemy.phaseRiftTime > 0 && enemy.phaseRiftSourceStat).length,
           lastReport: lastEchoReport ? { ...lastEchoReport } : null,
         } : null,
-        audio: audio.status(),
+        audio: audioStatus,
+        assets: {
+          audio: audioStatus.samples,
+          images: { ...renderCache.assetImageStatus },
+          manifests: {
+            audio: { ...THIRD_PARTY_AUDIO_ASSETS },
+            images: { ...THIRD_PARTY_IMAGE_ASSETS },
+          },
+        },
       });
     },
   });
@@ -8999,8 +9191,26 @@
         renderBenchmark: (options = {}) => renderBenchmark(options),
         audioTest: async () => {
           const ready = await audio.init();
+          if (ready) await audio.loadSamples();
           if (ready) audio.soundTest();
           return audio.status();
+        },
+        assetSmoke: () => {
+          if (!player) startGame();
+          const x = player?.x ?? WORLD.w / 2;
+          const y = player?.y ?? WORLD.h / 2;
+          spawnImpactAssetBurst(x + 96, y - 18, '#dffbff', true);
+          spawnAssetParticle(x - 92, y + 20, 'riftFlare', {
+            color: '#ffd166',
+            alpha: 0.42,
+            size: 86,
+            endSize: 122,
+            life: 0.75,
+            speed: 6,
+            spin: 0.25,
+          });
+          render(performance.now() / 1000);
+          return window.echoRiftStatus.assets;
         },
         tick: (frames = 1, draw = false) => {
           const count = clamp(Math.floor(Number(frames) || 1), 1, 3600);
@@ -9406,6 +9616,7 @@
 
   initLongFrameObserver();
   initBackground();
+  loadVisualAssets();
   applySettings();
   refreshMenuStats();
   resizeCanvas();
