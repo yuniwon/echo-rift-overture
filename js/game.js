@@ -107,7 +107,7 @@
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '6.11.1';
+  const GAME_VERSION = '7.0.0';
   const MAX_ENEMY_BULLETS = 680;
   const MAX_PLAYER_BULLETS = 360;
   const WORLD_UNITS_PER_METER = 10;
@@ -2300,6 +2300,14 @@
   let lastQualityChangeAt = 0;
   let qualitySampleStartedAt = performance.now();
   let qualityGraceUntil = qualitySampleStartedAt + 1500;
+  let lastQualityReason = 'initial';
+  let lastQualityFrameMs = 0;
+  let lastScenePressure = 0;
+  let frameGlowPasses = 0;
+  let lastRenderGlowPasses = 0;
+  let totalGlowPasses = 0;
+  let lastRenderFrameMs = 0;
+  let activeGlow = null;
 
   const view = { w: innerWidth, h: innerHeight, dpr: 1 };
   const camera = { x: WORLD.w / 2, y: WORLD.h / 2, shake: 0, traumaX: 0, traumaY: 0 };
@@ -2378,7 +2386,7 @@
   const aoeScratch = [];
   const chainScratch = [];
   const renderGroups = { player: new Map(), enemy: new Map(), particles: new Map() };
-  const renderCache = { background: null, vignettePlay: null, vignetteMenu: null, nebulaSprites: new Map() };
+  const renderCache = { background: null, vignettePlay: null, vignetteMenu: null, nebulaSprites: new Map(), glowBase: null, glowSprites: new Map() };
 
   function clearRenderGroups(map) {
     for (const group of map.values()) group.length = 0;
@@ -3368,6 +3376,7 @@
     quality = next;
     document.body.dataset.quality = String(quality);
     lastQualityChangeAt = performance.now();
+    lastQualityReason = reason;
     if (settings.graphicsMode === 'auto') {
       settings.autoQualityTier = Math.min(clamp(Math.floor(Number(settings.autoQualityTier ?? 2)), 0, 2), quality);
       autoQualityLocked = quality === 0;
@@ -3396,6 +3405,8 @@
   }
 
   function updateQuality(frameDt) {
+    const frameMs = frameDt * 1000;
+    lastQualityFrameMs = frameMs;
     recentLongFrameScore = Math.max(0, recentLongFrameScore - frameDt * 0.55);
     perfAccumulator += frameDt;
     perfFrames++;
@@ -3417,15 +3428,14 @@
     // A short arming window ignores one-off script compilation / scene setup spikes.
     const inGraceWindow = performance.now() < qualityGraceUntil;
     if (gameState === 'playing' && quality > 0 && !inGraceWindow) {
-      const scenePressure = arrays.enemyBullets.length
+      lastScenePressure = arrays.enemyBullets.length
         + arrays.playerBullets.length
         + arrays.particles.length * 0.55
         + arrays.enemies.length * 7
         + arrays.lasers.length * 34;
-      const pressureTrip = (quality === 2 && scenePressure > 520) || (quality === 1 && scenePressure > 820);
-      const frameTrip = frameDt > (quality === 2 ? 0.072 : 0.085) || recentLongFrameScore >= (quality === 2 ? 1.8 : 2.8);
-      if ((pressureTrip || frameTrip) && performance.now() - lastQualityChangeAt > 900) {
-        applyQualityTier(quality - 1, pressureTrip ? 'pressure' : 'long-frame');
+      const frameTimeTrip = frameMs > (quality === 2 ? 68 : 82) || recentLongFrameScore >= (quality === 2 ? 1.8 : 2.8);
+      if (frameTimeTrip && performance.now() - lastQualityChangeAt > 900) {
+        applyQualityTier(quality - 1, 'frame-time');
         lowFpsDuration = 0;
       }
     }
@@ -3445,7 +3455,7 @@
       lowFpsDuration += 1.25;
       const required = quality === 2 ? 1.25 : 2.5;
       if (lowFpsDuration >= required && performance.now() - lastQualityChangeAt > 900) {
-        applyQualityTier(quality - 1, 'fps');
+        applyQualityTier(quality - 1, 'frame-time');
         lowFpsDuration = 0;
       }
     } else {
@@ -4508,6 +4518,10 @@
     return changed.length ? changed.map((metric) => `${metric.label} ${metric.text}`).join(' · ') : '모든 전투 수치 기본';
   }
 
+  function routeCardImpactSummary(forecast) {
+    return routeForecastSummary(forecast, 3).replace('모든 전투 수치 기본', '전투 수치 기본');
+  }
+
   function renderForecastMetrics(forecast) {
     return forecast.metrics.map((metric) => {
       const tone = metric.percent > 0.5 ? (metric.key === 'xp' || metric.key === 'core' ? 'reward' : 'danger') : metric.percent < -0.5 ? 'relief' : 'neutral';
@@ -4596,14 +4610,21 @@
       button.dataset.route = route.id; button.dataset.grade = forecast.grade;
       button.setAttribute('aria-label',`${route.name}, 경로 ${route.risk}, 최종 위험 ${forecast.grade}, 기본 이상 현상 ${forecast.base.name}. ${routeForecastSummary(forecast,8)}. ${route.reward}`);
       const anomalyText = route.forceStable && pendingRouteBaseModifier?.id !== 'stable' ? `${pendingRouteBaseModifier.name} 제거` : forecast.base.name;
+      const meter = clamp(forecast.score / 1.35, 0.08, 1);
       button.innerHTML = `
         <div class="route-card-icon">${uiIcon(routeIconMap[route.id] || 'route')}</div>
-        <div class="route-card-copy"><div class="route-card-top"><span class="route-risk">${escapeHtml(route.risk)}</span><span class="route-final-grade" data-grade="${forecast.grade}">최종 ${forecast.grade}</span></div><h3>${escapeHtml(route.name)}</h3><div class="route-tagline">${escapeHtml(route.tagline)}</div></div>
-        <div class="route-effects">
+        <div class="route-card-main">
+          <div class="route-card-copy">
+            <div class="route-card-top"><span class="route-choice-key">${index+1}</span><span class="route-risk">${escapeHtml(route.risk)}</span><span class="route-final-grade" data-grade="${forecast.grade}">최종 ${forecast.grade}</span></div>
+            <h3>${escapeHtml(route.name)}</h3><div class="route-tagline">${escapeHtml(route.tagline)}</div>
+          </div>
+          <div class="route-card-meter" style="--route-meter:${meter.toFixed(3)}" aria-label="위험 계수 ${Math.round(meter * 100)}%"><i></i></div>
+        </div>
+        <div class="route-effects route-card-facts">
           <div class="route-effect anomaly"><span>기본 이상 현상</span><b>${escapeHtml(anomalyText)}</b></div>
           <div class="route-effect reward"><span>즉시·완료 보상</span><b>${escapeHtml(route.reward.replace('보상 · ',''))}</b></div>
-          <div class="route-effect forecast"><span>최종 전투 수치 · 확정</span><b>${escapeHtml(routeForecastSummary(forecast,6))}</b></div>
-        </div><div class="route-number">${index+1}</div>`;
+          <div class="route-effect forecast"><span>핵심 변화 · 확정</span><b>${escapeHtml(routeCardImpactSummary(forecast))}</b></div>
+        </div>`;
       button.addEventListener('pointerenter',()=>setRoutePreview(route,index));
       button.addEventListener('focus',()=>setRoutePreview(route,index));
       button.addEventListener('click',()=>selectRoute(route));
@@ -6978,19 +6999,67 @@
     return x > camera.x - view.w / 2 - radius && x < camera.x + view.w / 2 + radius && y > camera.y - view.h / 2 - radius && y < camera.y + view.h / 2 + radius;
   }
 
+  function buildGlowSprite() {
+    if (renderCache.glowBase) return renderCache.glowBase;
+    const size = 96;
+    const sprite = document.createElement('canvas');
+    sprite.width = sprite.height = size;
+    const g = sprite.getContext('2d');
+    const gradient = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, 'rgba(255,255,255,0.92)');
+    gradient.addColorStop(0.32, 'rgba(255,255,255,0.42)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gradient;
+    g.fillRect(0, 0, size, size);
+    renderCache.glowBase = sprite;
+    return sprite;
+  }
+
+  function glowSpriteForColor(color) {
+    const key = String(color || '#ffffff');
+    const cached = renderCache.glowSprites.get(key);
+    if (cached) return cached;
+    if (renderCache.glowSprites.size > 48) renderCache.glowSprites.clear();
+    const base = buildGlowSprite();
+    const sprite = document.createElement('canvas');
+    sprite.width = base.width;
+    sprite.height = base.height;
+    const g = sprite.getContext('2d');
+    g.drawImage(base, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = key;
+    g.fillRect(0, 0, sprite.width, sprite.height);
+    renderCache.glowSprites.set(key, sprite);
+    return sprite;
+  }
+
   function setGlow(color, blur = 12) {
-    const dense = arrays.enemyBullets.length + arrays.playerBullets.length > 420;
-    if (quality === 0 || settings.reducedMotion || dense) {
-      ctx.shadowBlur = 0;
-      return;
-    }
-    ctx.shadowColor = color;
-    ctx.shadowBlur = quality === 2 ? blur * 0.75 : blur * 0.35;
+    const dense = arrays.enemyBullets.length + arrays.playerBullets.length > 620;
+    activeGlow = (quality === 0 || settings.reducedMotion || dense)
+      ? null
+      : { color, blur: Math.max(0, Number(blur) || 0) };
+    return activeGlow;
   }
 
   function clearGlow() {
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
+    activeGlow = null;
+  }
+
+  function drawGlowSprite(x, y, radius, color = activeGlow?.color, alpha = 0.48) {
+    if (quality === 0 || settings.reducedMotion || !color || radius <= 0) return false;
+    const sprite = glowSpriteForColor(color);
+    const scale = quality === 2 ? 6.2 : 4.4;
+    const size = clamp(radius * scale, 10, 104);
+    const previousAlpha = ctx.globalAlpha;
+    const previousComposite = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = clamp(alpha, 0, 1);
+    ctx.drawImage(sprite, x - size / 2, y - size / 2, size, size);
+    ctx.globalAlpha = previousAlpha;
+    ctx.globalCompositeOperation = previousComposite;
+    frameGlowPasses += 1;
+    totalGlowPasses += 1;
+    return true;
   }
 
   function tracePolygon(sides, radius, rotation = 0, alternate = 1) {
@@ -7244,6 +7313,10 @@
       ctx.globalAlpha = sample.fromEcho ? 0.56 : sample.fromDrone ? 0.7 : 0.76;
       ctx.lineWidth = Math.max(1.3, sample.radius * (sample.crit ? 1.05 : 0.75));
       setGlow(color, sample.crit ? 14 : 8);
+      for (const b of group) {
+        const glowRadius = Math.max(2.8, b.radius * (b.crit ? 2.8 : 2.1));
+        drawGlowSprite(b.x, b.y, glowRadius, color, b.crit ? 0.5 : sample.fromEcho ? 0.34 : 0.4);
+      }
       ctx.beginPath();
       for (const b of group) { ctx.moveTo(b.prevX, b.prevY); ctx.lineTo(b.x - b.vx * 0.012, b.y - b.vy * 0.012); }
       ctx.stroke();
@@ -7297,6 +7370,9 @@
       ctx.strokeStyle = color;
       ctx.lineWidth = Math.max(1.4, sample.radius * 0.65);
       setGlow(color, 9);
+      for (const b of group) {
+        drawGlowSprite(b.x, b.y, Math.max(3.2, b.radius * 2.5), color, 0.38);
+      }
       ctx.beginPath();
       for (const b of group) { ctx.moveTo(b.prevX, b.prevY); ctx.lineTo(b.x, b.y); }
       ctx.stroke();
@@ -8033,7 +8109,13 @@
       ctx.globalAlpha = sample.alpha * sampleT;
       ctx.fillStyle = sample.color;
       ctx.strokeStyle = sample.color;
-      if (quality === 2 && group.length < 35) setGlow(sample.color, Math.min(7, sample.glow));
+      if (quality === 2 && group.length < 35) {
+        for (const p of group) {
+          const t = clamp(p.life / p.maxLife, 0, 1);
+          const size = Math.max(.2, lerp(p.endSize, p.size, t));
+          drawGlowSprite(p.x, p.y, Math.max(size, p.glow * 0.45), sample.color, sample.alpha * t * 0.3);
+        }
+      }
       if (sample.shape === 'line') {
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -8246,6 +8328,8 @@
   }
 
   function render(time) {
+    const renderStartedAt = performance.now();
+    frameGlowPasses = 0;
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -8279,6 +8363,8 @@
 
     ctx.fillStyle = gameState === 'playing' ? renderCache.vignettePlay : renderCache.vignetteMenu;
     ctx.fillRect(0, 0, view.w, view.h);
+    lastRenderGlowPasses = frameGlowPasses;
+    lastRenderFrameMs = performance.now() - renderStartedAt;
   }
 
   // ---------------------------------------------------------------------------
@@ -8529,6 +8615,184 @@
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
   }
 
+  function clearBenchmarkScene() {
+    arrays.enemies.length = 0;
+    while (arrays.playerBullets.length) recyclePlayerBullet(arrays.playerBullets.length - 1);
+    while (arrays.enemyBullets.length) recycleEnemyBullet(arrays.enemyBullets.length - 1);
+    while (arrays.particles.length) {
+      const particle = swapRemove(arrays.particles, arrays.particles.length - 1);
+      if (particle) particlePool.push(particle);
+    }
+    arrays.lasers.length = 0;
+    arrays.pickups.length = 0;
+    arrays.echoes.length = 0;
+    arrays.shockwaves.length = 0;
+    arrays.floaters.length = 0;
+    arrays.links.length = 0;
+    enemyGrid.clear();
+    if (currentWave) {
+      currentWave.spawnTimer = 9999;
+      currentWave.spawnRemaining = 1;
+      currentWave.completed = false;
+      currentWave.clearTimer = 0;
+    }
+  }
+
+  function spawnBenchmarkEnemyBullets(count = 160, seed = 700) {
+    if (!player) return 0;
+    const rng = mulberry32(Math.floor(Number(seed) || 700));
+    const total = clamp(Math.floor(Number(count) || 160), 1, MAX_ENEMY_BULLETS);
+    const centerX = player.x;
+    const centerY = player.y;
+    const colors = ['#ff5e91', '#ff9ac0', '#d66bff'];
+    for (let i = 0; i < total; i += 1) {
+      const angle = i * TAU / total;
+      const ring = 105 + (i % 5) * 18 + rng() * 8;
+      spawnEnemyBullet(
+        centerX + Math.cos(angle) * ring,
+        centerY + Math.sin(angle) * ring,
+        angle + Math.PI * 0.42 + (rng() - 0.5) * 0.18,
+        180 + (i % 7) * 12,
+        1,
+        3.6 + (i % 4) * 0.7,
+        colors[i % colors.length],
+        { life: 9 }
+      );
+    }
+    return arrays.enemyBullets.length;
+  }
+
+  function spawnBenchmarkParticles(count = 70, seed = 701) {
+    if (!player) return 0;
+    const rng = mulberry32(Math.floor(Number(seed) || 701));
+    const total = clamp(Math.floor(Number(count) || 70), 0, maxParticles());
+    const centerX = player.x;
+    const centerY = player.y;
+    for (let i = 0; i < total; i += 1) {
+      const angle = i * TAU / Math.max(1, total);
+      spawnParticle(centerX + Math.cos(angle) * (70 + (i % 9) * 12), centerY + Math.sin(angle) * (55 + (i % 7) * 10), {
+        angle: angle + 0.8 + (rng() - 0.5) * 0.12,
+        speed: 40 + (i % 8) * 8,
+        life: 1.6,
+        size: 1.5 + (i % 5) * 0.55,
+        endSize: 0,
+        color: i % 2 ? '#72e8ff' : '#ff80b5',
+        glow: 8,
+        shape: i % 6 === 0 ? 'line' : 'circle',
+        alpha: 0.85,
+        drag: 4,
+        gravity: 0,
+        rotation: 0,
+        spin: 0,
+      });
+    }
+    return arrays.particles.length;
+  }
+
+  function withRenderShadowProbe(callback) {
+    const prop = 'shadow' + 'Blur';
+    const proto = CanvasRenderingContext2D.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, prop);
+    let uses = 0;
+    let patched = false;
+    try {
+      if (desc?.get && desc?.set) {
+        Object.defineProperty(ctx, prop, {
+          configurable: true,
+          get() { return desc.get.call(ctx); },
+          set(value) {
+            if (Number(value) > 0) uses += 1;
+            desc.set.call(ctx, value);
+          },
+        });
+        patched = true;
+      }
+    } catch (_) {
+      patched = false;
+    }
+    try {
+      return callback(() => uses);
+    } finally {
+      if (patched) delete ctx[prop];
+    }
+  }
+
+  function renderBenchmark(options = {}) {
+    if (!player) startGame();
+    if (tutorial?.active) finishEchoTutorial(true);
+    if (!player) return null;
+    const previousSettings = {
+      graphicsMode: settings.graphicsMode,
+      reducedMotion: settings.reducedMotion,
+      shake: settings.shake,
+      autoQualityTier: settings.autoQualityTier,
+    };
+    const previousQuality = quality;
+    const previousAutoLocked = autoQualityLocked;
+    const frames = clamp(Math.floor(Number(options.frames ?? 90)), 1, 360);
+    const warmup = clamp(Math.floor(Number(options.warmup ?? 30)), 0, 120);
+    const seed = Math.floor(Number(options.seed) || 700);
+    try {
+      settings.graphicsMode = 'high';
+      settings.reducedMotion = false;
+      settings.shake = false;
+      quality = 2;
+      document.body.dataset.quality = String(quality);
+      autoQualityLocked = false;
+      resizeCanvas();
+      clearBenchmarkScene();
+      camera.x = player.x;
+      camera.y = player.y;
+      const enemyBullets = spawnBenchmarkEnemyBullets(options.enemyBullets ?? 160, seed);
+      const particles = spawnBenchmarkParticles(options.particles ?? 70, seed + 1);
+      const samples = [];
+      const result = withRenderShadowProbe((shadowCount) => {
+        let measuredGlowBefore = totalGlowPasses;
+        let measuredShadowBefore = shadowCount();
+        for (let i = 0; i < warmup + frames; i += 1) {
+          if (i === warmup) {
+            measuredGlowBefore = totalGlowPasses;
+            measuredShadowBefore = shadowCount();
+          }
+          const started = performance.now();
+          render((started + i * 16.6667) / 1000);
+          const elapsed = performance.now() - started;
+          if (i >= warmup) samples.push(elapsed);
+        }
+        const sorted = samples.slice().sort((a, b) => a - b);
+        const sum = samples.reduce((total, value) => total + value, 0);
+        const percentile = (p) => sorted[Math.max(0, Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * p)))] || 0;
+        return {
+          version: GAME_VERSION,
+          enemyBullets,
+          particles,
+          frames,
+          warmup,
+          avgFrameMs: Number((sum / samples.length).toFixed(3)),
+          maxFrameMs: Number(Math.max(...samples).toFixed(3)),
+          minFrameMs: Number(Math.min(...samples).toFixed(3)),
+          p50FrameMs: Number(percentile(0.5).toFixed(3)),
+          p95FrameMs: Number(percentile(0.95).toFixed(3)),
+          glowPasses: totalGlowPasses - measuredGlowBefore,
+          shadowBlurUses: shadowCount() - measuredShadowBefore,
+          quality,
+          dpr: Number(view.dpr.toFixed(3)),
+          viewport: { w: view.w, h: view.h },
+        };
+      });
+      return result;
+    } finally {
+      settings.graphicsMode = previousSettings.graphicsMode;
+      settings.reducedMotion = previousSettings.reducedMotion;
+      settings.shake = previousSettings.shake;
+      settings.autoQualityTier = previousSettings.autoQualityTier;
+      quality = previousQuality;
+      document.body.dataset.quality = String(quality);
+      autoQualityLocked = previousAutoLocked;
+      resizeCanvas();
+    }
+  }
+
   // Read-only diagnostics make the offline build verifiable without exposing mutable state.
   Object.defineProperty(window, 'echoRiftStatus', {
     get() {
@@ -8596,6 +8860,14 @@
         autoQualityLocked,
         longFrameCount,
         renderScale: Number(view.dpr.toFixed(2)),
+        renderPerf: {
+          lastFrameMs: Number(lastRenderFrameMs.toFixed(3)),
+          glowPasses: lastRenderGlowPasses,
+          totalGlowPasses,
+          qualityFrameMs: Number(lastQualityFrameMs.toFixed(3)),
+          scenePressure: Number(lastScenePressure.toFixed(1)),
+          lastQualityReason,
+        },
         particles: arrays.particles.length,
         phaseRift: {
           procs: phaseRiftProcs,
@@ -8684,6 +8956,7 @@
           return window.echoRiftStatus;
         },
         audioStatus: () => audio.status(),
+        renderBenchmark: (options = {}) => renderBenchmark(options),
         audioTest: async () => {
           const ready = await audio.init();
           if (ready) audio.soundTest();

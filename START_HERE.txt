@@ -1,10 +1,15 @@
-ECHO RIFT: OVERTURE 6.11 — 빠른 시작
+ECHO RIFT: OVERTURE 7.0 — 빠른 시작
 
 1. 압축파일을 풉니다.
 2. index.html을 더블클릭하면 바로 플레이할 수 있습니다.
 3. 설치형 PWA와 완전한 오프라인 캐시를 사용하려면:
    - Windows: start_windows.bat
    - macOS / Linux: start_mac_linux.sh
+
+7.0 변경
+- 적탄, 플레이어 탄환, 입자의 네온 글로우가 Canvas shadow blur 대신 사전 렌더 글로우 스프라이트로 그려집니다.
+- 자동 품질 강등은 물체 수가 아니라 실측 frame time을 우선 근거로 삼습니다.
+- verify-7.0-render는 글로우 스프라이트 렌더링, frame-time 품질 강등, 고정 탄막 렌더 벤치를 실제 브라우저에서 확인합니다.
 
 6.11 변경
 - 설정 화면에서 이동·조준·사격·대시·잔향·리롤·일시정지 키를 다시 지정할 수 있습니다.

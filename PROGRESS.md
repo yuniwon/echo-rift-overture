@@ -153,3 +153,48 @@ The remaining P0 risk is that player control and partial-reroll economy changes 
 ### Patch 6.11.1
 
 Chrome mouse regression fixed: clicking a non-control area of an upgrade card selects the choice again, while lock clicks remain lock-only. `verify-6.11-control` now covers body click selection, lock click non-selection, and explicit select button selection.
+
+## Iteration 3 — PRISM Render Performance
+
+Date: 2026-06-24
+
+Build: `ECHO RIFT: OVERTURE 7.0 — PRISM`
+
+Decision: keep scope narrow. Runtime changes are limited to combat glow rendering, frame-time-based auto quality downgrade, and QA render benchmarking. No content, combat balance, storage schema, or online telemetry change is included.
+
+### Hypothesis
+
+The next bottleneck is not rules or content; it is Canvas 2D glow cost during dense bullet scenes. Replacing hot-path shadow blur with cached glow sprites should preserve neon readability while reducing per-frame rendering spikes.
+
+### Files Changed
+
+- `js/game.js`
+- `sw.js`
+- `scripts/verify-7.0-render.mjs`
+- `BASELINE_AUDIT.md`
+- `IMPLEMENTATION_PLAN.md`
+- release docs and `CHECKSUMS.sha256`
+
+### Checks
+
+| Check | Result | Evidence |
+|---|---|---|
+| `node scripts/verify-7.0-render.mjs` before implementation | FAIL EXPECTED | `verify-7.0-render failed (28)` |
+| `node --check js/game.js` | PASS | exit code 0, no output |
+| `node --check sw.js` | PASS | exit code 0, no output |
+| `node --check scripts/verify-7.0-render.mjs` | PASS | exit code 0, no output |
+| `node scripts/verify-7.0-render.mjs` | PASS | `verify-7.0-render passed` |
+| `node scripts/verify-7.0-render.mjs --viewports` | PASS | `verify-7.0-render passed` |
+| `node scripts/verify-6.9.mjs` | PASS | `verify-6.9 passed` |
+| `node scripts/verify-6.10-hardening.mjs` | PASS | `verify-6.10-hardening passed` |
+| `node scripts/verify-6.11-control.mjs` | PASS | `verify-6.11-control passed` |
+| PRISM render benchmark after implementation | PASS | 160 enemy bullets, 70 particles, 90 measured frames: avg 17.292 ms, max 256.900 ms, shadowBlurUses 0, glowPasses 17,550 |
+| `CHECKSUMS.sha256` verify | PASS | `checksum verify OK (40 files)` |
+
+### Before / After
+
+| Area | Before | After |
+|---|---|---|
+| Bullet/particle glow | Canvas `ctx.shadowBlur` in hot draw paths | Cached glow sprite `drawImage` path |
+| Auto quality downgrade | Object pressure or frame/FPS trip | Frame-time/FPS trip; object pressure as diagnostics |
+| QA render proof | No deterministic render benchmark hook | `__echoRiftQA.renderBenchmark()` reports frame time, glow passes, shadow blur uses |

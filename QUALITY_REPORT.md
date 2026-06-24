@@ -1,8 +1,25 @@
 # ECHO RIFT Quality Loop Report
 
-## 현재 상태 — 6.11 CONTROL
+## 현재 상태 — 7.0 PRISM
 
-Iteration 1에서 import/service-worker 하드닝과 행동 기반 회귀 검증을 추가했고, Iteration 2에서 키보드 리매핑, 강화 카드 접근성 구조, 부분 리롤 경제 계측, 90초 Playwright 전투/컨트롤 루프를 추가했다. 이 보고서의 초기 6.9 기준선은 보존하되, 현재 자동 검증 기준은 `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+Iteration 3에서 전투 렌더링 성능 회복을 위해 hot path `ctx.shadowBlur` 글로우를 사전 렌더 글로우 스프라이트로 교체하고, 자동 품질 강등을 frame-time 기반으로 교정했다. 현재 자동 검증 기준은 `scripts/verify-7.0-render.mjs`, `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+
+## PRISM Before / After
+
+`renderBenchmark` 시나리오: 1366×768 headless Chromium, high quality, reduced motion off, 160 enemy bullets, 70 particles, 30 warmup frames excluded, 90 measured render frames.
+
+| Metric | Before 6.11.1 CONTROL | After 7.0.0 PRISM |
+|---|---:|---:|
+| Avg render frame | 64.644 ms | 17.292 ms |
+| Max render frame | 3091.700 ms | 256.900 ms |
+| Min render frame | 0.100 ms | 0.300 ms |
+| P50 render frame | Not captured | 0.500 ms |
+| P95 render frame | Not captured | 237.800 ms |
+| Positive shadow blur writes | 720 | 0 |
+| Glow sprite passes | N/A | 17,550 |
+| Console/page errors | 0 | 0 |
+
+Headless Chromium timing is a relative comparison signal only. High-refresh and low-end device feel still require manual confirmation.
 
 아직 완료로 주장하지 않는 항목은 물리 게임패드 리매핑, 조준 감도/데드존/축 반전, 터치 버튼 위치 편집, 저사양 모바일 실기기, 오디오 청감, 필수 뷰포트 캡처 세트다.
 

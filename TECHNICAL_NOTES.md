@@ -1,4 +1,30 @@
-# ECHO RIFT: OVERTURE 6.11 — 기술 노트 (CONTROL)
+# ECHO RIFT: OVERTURE 7.0 — 기술 노트 (PRISM)
+
+## 7.0 목표
+
+PRISM은 콘텐츠 추가가 아니라 전투 렌더링 성능 회복만 다룹니다. Canvas 2D와 무의존 PWA 구조는 유지하고, 탄막 장면의 네온 글로우 구현을 `ctx.shadowBlur`에서 사전 렌더 글로우 스프라이트로 전환합니다.
+
+## 글로우 렌더링 경계
+
+`renderCache.glowBase`는 흰색 방사형 알파 스프라이트를 한 번 생성합니다. `renderCache.glowSprites`는 색상별 tint 결과를 캐시하며, 전투 중 탄환마다 radial gradient를 만들지 않습니다. 적탄, 플레이어/잔향 탄환, 입자 draw 경로는 `drawGlowSprite()`로 가산 합성 스프라이트를 먼저 깔고, 기존 형상 geometry를 그대로 그립니다.
+
+`setGlow()`와 `clearGlow()`는 기존 호출부 호환을 위한 active state만 관리하며 Canvas shadow 속성을 쓰지 않습니다. 따라서 hot projectile/particle draw path의 glow 비용은 `shadowBlur`가 아니라 스프라이트 `drawImage` 비용으로 제한됩니다.
+
+## 자동 품질 보호
+
+`updateQuality(frameDt)`는 `frameMs`와 long-animation-frame 점수를 기준으로 자동 강등을 판단합니다. 물체 수 압력은 `window.echoRiftStatus.renderPerf.scenePressure` 진단값으로만 남기고, `pressureTrip` 강등 경로는 제거했습니다.
+
+자동 모드의 one-way/sticky 계약은 유지합니다. 품질은 런 중 자동으로 낮아질 수 있지만, 사용자가 다시 측정하거나 수동 설정을 바꾸기 전까지 자동으로 올라가지 않습니다.
+
+## PRISM 행동 검증
+
+`scripts/verify-7.0-render.mjs`는 다음을 확인합니다.
+
+- 런타임 소스에 `ctx.shadowBlur` 직접 사용이 없는지 확인
+- player/enemy bullet과 particle hot path가 `drawGlowSprite()`를 사용하고 radial gradient를 만들지 않는지 확인
+- 6.8 SIGNAL의 projectile shape/palette 분기가 남아 있는지 확인
+- `updateQuality()`가 frame-time 기반 강등을 사용하고 sticky 자동 품질 계약을 유지하는지 확인
+- QA 전용 `renderBenchmark()`가 160 적탄 / 70 입자 장면에서 프레임타임, 글로우 패스, shadow blur 사용 횟수를 반환하는지 확인
 
 ## 6.11 목표
 
@@ -98,7 +124,7 @@
 
 ## 서비스워커 폴백
 
-`CACHE_NAME`은 `echo-rift-control-v6.11.1`입니다. fetch 전략은 요청 종류별로 분리했습니다.
+`CACHE_NAME`은 `echo-rift-prism-v7.0.0`입니다. fetch 전략은 요청 종류별로 분리했습니다.
 
 - `request.mode === 'navigate'`: 네트워크 우선, 실패 시에만 캐시된 `index.html` 반환
 - 스크립트·CSS·이미지·manifest 등 에셋: 캐시 우선, 네트워크 실패 시 `Response.error()`
