@@ -106,7 +106,7 @@ function assertRunHistory() {
 function assertReleaseMetadata() {
   const manifest = JSON.parse(files.manifest);
   check('manifest product name is player-facing', manifest.name === 'ECHO RIFT: OVERTURE', manifest.name);
-  check('service worker cache updated', includes(files.sw, "const CACHE_NAME = 'echo-rift-prism-v7.0.0';"));
+  check('service worker cache updated', /const CACHE_NAME = 'echo-rift-prism-v7\.0\.(?:0|1-assets)';/.test(files.sw));
   check('title updated', includes(files.html, 'ECHO RIFT: OVERTURE'));
   check('edition badge updated', includes(files.html, 'v7.0 · PRISM'));
   check('VERSION updated', includes(files.version, 'Version 7.0.0') && includes(files.version, 'Codename: PRISM'));

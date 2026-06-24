@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echo-rift-prism-v7.0.0';
+const CACHE_NAME = 'echo-rift-prism-v7.0.1-assets';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,20 @@ const CORE_ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-192.png',
-  './icons/maskable-512.png'
+  './icons/maskable-512.png',
+  './assets/audio/kenney-ui/ui-hover.ogg',
+  './assets/audio/kenney-ui/ui-select.ogg',
+  './assets/audio/kenney-ui/ui-switch.ogg',
+  './assets/audio/kenney-sci-fi/laser-small.ogg',
+  './assets/audio/kenney-sci-fi/force-field.ogg',
+  './assets/audio/kenney-sci-fi/explosion-crunch.ogg',
+  './assets/audio/kenney-sci-fi/low-boom.ogg',
+  './assets/images/kenney-space/impact-cloud.png',
+  './assets/images/kenney-space/rift-flare.png',
+  './assets/vendor/kenney/ui-audio/License.txt',
+  './assets/vendor/kenney/sci-fi-sounds/License.txt',
+  './assets/vendor/kenney/space-shooter-extension/License.txt',
+  './THIRD_PARTY_NOTICES.md'
 ];
 
 function isSameOrigin(request) {

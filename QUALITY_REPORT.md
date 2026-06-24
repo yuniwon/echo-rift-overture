@@ -2,7 +2,15 @@
 
 ## 현재 상태 — 7.0 PRISM
 
-Iteration 3에서 전투 렌더링 성능 회복을 위해 hot path `ctx.shadowBlur` 글로우를 사전 렌더 글로우 스프라이트로 교체하고, 자동 품질 강등을 frame-time 기반으로 교정했다. 현재 자동 검증 기준은 `scripts/verify-7.0-render.mjs`, `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+Iteration 3에서 전투 렌더링 성능 회복을 위해 hot path `ctx.shadowBlur` 글로우를 사전 렌더 글로우 스프라이트로 교체하고, 자동 품질 강등을 frame-time 기반으로 교정했다. 7.0.1 에셋 패스에서는 Kenney CC0 에셋의 작은 로컬 부분 집합을 사운드/시각 피드백 레이어로 추가했다. 현재 자동 검증 기준은 `scripts/verify-7.0-render.mjs`, `scripts/verify-asset-pack.mjs`, `scripts/verify-ui-readability.mjs`, `scripts/verify-route-layout.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+
+## 7.0.1 Asset Pass
+
+- 소스: Kenney UI Audio, Sci-Fi Sounds, Space Shooter Extension.
+- 라이선스: Creative Commons Zero, 각 로컬 복사본은 `assets/vendor/kenney/**/License.txt`.
+- 런타임 파일: OGG 7개, PNG 효과 2개, `THIRD_PARTY_NOTICES.md`.
+- 적용 방식: 기존 Web Audio 합성음 위에 짧은 샘플을 겹치고, 기존 particle pool 안에서 충격 구름/위상 플레어를 그린다.
+- 미확인 한계: 실제 스피커/헤드폰 청감 밸런스, 저사양 모바일 오디오 지연, 장시간 플레이 중 샘플 선호도는 수동 확인 필요.
 
 ## PRISM Before / After
 
