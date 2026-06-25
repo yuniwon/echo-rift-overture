@@ -66,6 +66,10 @@ async function startFreshFirstContact(page) {
     localStorage.removeItem('echoRiftSaveV2');
     localStorage.removeItem('echoRiftSettingsV1');
     localStorage.removeItem('echoRiftRunHistoryV1');
+  });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => window.__echoRiftQA && window.echoRiftStatus);
+  await page.evaluate(() => {
     window.__echoRiftQA.start();
   });
   await page.waitForFunction(() => window.echoRiftStatus?.tutorial?.active === true);
@@ -89,12 +93,21 @@ async function advanceCoachToPair(page) {
   return page.evaluate(() => window.echoRiftStatus);
 }
 
+async function clearFirstContactWarmup(page) {
+  return page.evaluate(() => {
+    const targets = window.__echoRiftQA.firstContactTargets();
+    if (targets.warmupId) window.__echoRiftQA.phaseRiftHit(targets.warmupId, 'present', 999);
+    window.__echoRiftQA.tick(8, true);
+    return { targets, status: window.echoRiftStatus };
+  });
+}
+
 function runStaticChecks() {
-  check('7.1 runtime version is present', files.game.includes("GAME_VERSION = '7.1.0'"));
+  check('7.1 runtime version is present', /GAME_VERSION = '7\.1\.\d+'/.test(files.game));
   check('FIRST CONTACT docs are present', files.readme.includes('FIRST CONTACT'));
-  check('7.1 cache name is present', files.sw.includes('echo-rift-first-contact-v7.1.0'));
+  check('7.1 cache name is present', /echo-rift-first-contact-v7\.1\.\d+/.test(files.sw));
   check('onboarding status is exposed', files.game.includes('onboarding: getRunOnboardingStatus()'));
-  check('first-contact QA hooks are exposed', files.game.includes('startFirstContactProbe') && files.game.includes('tutorialNeutralGateProbe'));
+  check('first-contact QA hooks are exposed', files.game.includes('startFirstContactProbe') && files.game.includes('tutorialNeutralGateProbe') && files.game.includes('prepareFirstContactRewardEdge'));
 }
 
 async function runFirstContactProbe(page, baseUrl) {
@@ -127,12 +140,7 @@ async function runFirstContactProbe(page, baseUrl) {
   check('normal wave spawn budget is not consumed by first-contact gate', pausedAfter.spawnRemaining === pausedBefore.spawnRemaining, JSON.stringify({ pausedBefore, pausedAfter }));
   check('first-contact enemy pressure remains small before reward', pausedAfter.enemies <= 2 && pausedAfter.onboarding?.maxActiveEnemiesBeforeFirstUpgrade <= 2, JSON.stringify(pausedAfter));
 
-  const warmup = await page.evaluate(() => {
-    const targets = window.__echoRiftQA.firstContactTargets();
-    if (targets.warmupId) window.__echoRiftQA.phaseRiftHit(targets.warmupId, 'present', 999);
-    window.__echoRiftQA.tick(8, true);
-    return { targets, status: window.echoRiftStatus };
-  });
+  const warmup = await clearFirstContactWarmup(page);
   check('warmup kill is recorded as first kill', Number.isFinite(warmup.status.onboarding?.firstKillAt), JSON.stringify(warmup));
   check('warmup kill does not open upgrade by itself', warmup.status.state === 'playing' && warmup.status.choices.length === 0, JSON.stringify(warmup.status));
 
@@ -172,6 +180,39 @@ async function runFirstContactProbe(page, baseUrl) {
   check('first upgrade chosen metric is recorded', Number.isFinite(released.onboarding?.firstUpgradeChosenAt), JSON.stringify(released.onboarding));
 }
 
+async function runRewardEdgeProbe(page, baseUrl) {
+  await waitForQa(page, baseUrl);
+
+  await startFreshFirstContact(page);
+  await clearFirstContactWarmup(page);
+  await advanceCoachToPair(page);
+  const highGain = await page.evaluate(() => {
+    const targetId = window.echoRiftStatus.onboarding?.phaseTargetId || window.echoRiftStatus.fieldCoach?.focusTarget?.enemyId;
+    const prepared = window.__echoRiftQA.prepareFirstContactRewardEdge({ xpGain: 3.25, xpMissing: 5, pendingLevelUps: 0 });
+    const present = window.__echoRiftQA.phaseRiftHit(targetId, 'present', 20);
+    const echo = window.__echoRiftQA.phaseRiftHit(targetId, 'echo', 20);
+    window.__echoRiftQA.tick(45, true);
+    return { prepared, present, echo, status: window.echoRiftStatus };
+  });
+  check('high xpGain first-contact reward opens one upgrade only', highGain.status.state === 'upgrade' && highGain.status.choices.length > 0 && highGain.status.pendingLevelUps === 0, JSON.stringify(highGain));
+  check('high xpGain reward is reserved once', highGain.status.onboarding?.rewardClaims === 1 && highGain.status.onboarding?.reservedLevelUps === 1, JSON.stringify(highGain.status.onboarding));
+
+  await page.evaluate(() => window.__echoRiftQA.startFirstContactProbe());
+  await page.waitForFunction(() => window.echoRiftStatus?.fieldCoach?.active === true);
+  await clearFirstContactWarmup(page);
+  await advanceCoachToPair(page);
+  const pending = await page.evaluate(() => {
+    const targetId = window.echoRiftStatus.onboarding?.phaseTargetId || window.echoRiftStatus.fieldCoach?.focusTarget?.enemyId;
+    const prepared = window.__echoRiftQA.prepareFirstContactRewardEdge({ xpGain: 1, xpMissing: 40, pendingLevelUps: 1 });
+    const present = window.__echoRiftQA.phaseRiftHit(targetId, 'present', 20);
+    const echo = window.__echoRiftQA.phaseRiftHit(targetId, 'echo', 20);
+    window.__echoRiftQA.tick(45, true);
+    return { prepared, present, echo, status: window.echoRiftStatus };
+  });
+  check('existing pending level is not duplicated by first-contact reward', pending.status.state === 'upgrade' && pending.status.choices.length > 0 && pending.status.pendingLevelUps === 0, JSON.stringify(pending));
+  check('existing pending level still records one first-contact claim', pending.status.onboarding?.rewardClaims === 1 && pending.status.onboarding?.reservedLevelUps === 1, JSON.stringify(pending.status.onboarding));
+}
+
 async function runCleanupProbe(page, baseUrl) {
   await waitForQa(page, baseUrl);
   await page.evaluate(() => window.__echoRiftQA.startFirstContactProbe());
@@ -202,6 +243,20 @@ async function runInputNeutralProbe(page, baseUrl) {
   check('touch state is cleared and suppressed through gate', probe?.touch?.blockedMoveMag === 0 && probe?.touch?.releasedMoveMag > 0, JSON.stringify(probe?.touch));
   check('synthetic gamepad axes are suppressed until neutral', probe?.gamepad?.blockedMoveMag === 0 && probe?.gamepad?.releasedMoveMag > 0, JSON.stringify(probe?.gamepad));
   check('tutorial progress is frozen while neutral gate is active', probe?.tutorial?.progressWhileBlocked === 0 && probe?.tutorial?.progressAfterRelease >= 0, JSON.stringify(probe?.tutorial));
+
+  const pointerDuringGate = await page.evaluate(() => {
+    window.__echoRiftQA.startTraining();
+    window.__echoRiftQA.tutorialStep(1);
+    const canvas = document.querySelector('#gameCanvas');
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 7301, pointerType: 'mouse', button: 0, buttons: 1, clientX: 120, clientY: 120, bubbles: true }));
+    window.__echoRiftQA.tick(20, true);
+    const held = { ...window.echoRiftStatus.input.neutralGate };
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 7301, pointerType: 'mouse', button: 0, buttons: 0, clientX: 120, clientY: 120, bubbles: true }));
+    window.__echoRiftQA.tick(20, true);
+    const released = { ...window.echoRiftStatus.input.neutralGate };
+    return { held, released };
+  });
+  check('pointerdown during active neutral gate holds gate until pointerup', pointerDuringGate.held.active === true && pointerDuringGate.held.blockedPointers >= 1 && pointerDuringGate.released.active === false, JSON.stringify(pointerDuringGate));
 }
 
 runStaticChecks();
@@ -216,6 +271,7 @@ try {
   page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
   page.on('pageerror', (err) => consoleErrors.push(err.message));
   await runFirstContactProbe(page, baseUrl);
+  await runRewardEdgeProbe(page, baseUrl);
   await runCleanupProbe(page, baseUrl);
   await runInputNeutralProbe(page, baseUrl);
   check('browser console has no errors', consoleErrors.length === 0, consoleErrors.join('\n'));

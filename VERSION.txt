@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 7.1.0
+Version 7.1.1
 Codename: FIRST CONTACT
 Build date: 2026-06-25
-Focus: first-minute onboarding. A fresh run now pauses normal wave pressure until the player kills a safe warmup enemy, records a combat echo, deploys it, opens a first phase rift on a dedicated target, and chooses the first upgrade. Rendering, combat balance, save keys, tutorial step counts, and offline dependency boundaries remain unchanged.
+Focus: first-minute onboarding hardening. A fresh run now pauses normal wave pressure until the player kills a safe warmup enemy, records a combat echo, deploys it, opens a first phase rift on a dedicated target, and chooses the first upgrade. Review hardening keeps pointer/touch input gates latched until release and proves high-XP-gain / pre-pending reward cases. Rendering, combat balance, save keys, tutorial step counts, and offline dependency boundaries remain unchanged.

@@ -203,7 +203,22 @@ The next bottleneck is not rules or content; it is Canvas 2D glow cost during de
 
 Date: 2026-06-25
 
-Build: `ECHO RIFT: OVERTURE 7.1 — FIRST CONTACT`
+Build: `ECHO RIFT: OVERTURE 7.1.1 — FIRST CONTACT`
+
+### Review hardening — GPT follow-up
+
+The review package contained a follow-up review prompt rather than a completed findings document. I re-ran that review against the merged 7.1 implementation and patched the concrete gaps it exposed:
+
+- Neutral gates now track pointer/touch presses that begin while the gate is already active, so a held click or touch cannot become the next tutorial step's first input after only 0.15s.
+- `verify-7.1-first-contact` now proves first-contact reward behavior with `player.xpGain > 1` and with an existing `pendingLevelUps > 0`.
+- The verifier's fresh-start helper reloads the page after clearing localStorage so in-memory `fieldCoachSeen` state cannot leak between scenarios.
+- Runtime version and PWA cache metadata moved to `7.1.1`.
+
+| Command | Result | Evidence |
+|---|---|---|
+| `node --check js/game.js` | PASS | exit code 0, no output |
+| `node --check scripts/verify-7.1-first-contact.mjs` | PASS | exit code 0, no output |
+| `node scripts/verify-7.1-first-contact.mjs` | PASS | `verify-7.1-first-contact passed` |
 
 Decision: keep scope narrow. Runtime changes are limited to the first normal run's first-minute pacing gate, first-contact reward chain, tutorial input neutralization, and QA proof. No combat balance, new content, storage schema, rendering path, external dependency, or online telemetry change is included.
 

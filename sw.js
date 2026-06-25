@@ -1,4 +1,4 @@
-const CACHE_NAME = 'echo-rift-first-contact-v7.1.0';
+const CACHE_NAME = 'echo-rift-first-contact-v7.1.1';
 const CORE_ASSETS = [
   './',
   './index.html',

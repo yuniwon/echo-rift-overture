@@ -115,7 +115,7 @@
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '7.1.0';
+  const GAME_VERSION = '7.1.1';
   const THIRD_PARTY_AUDIO_ASSETS = Object.freeze({
     uiHover: './assets/audio/kenney-ui/ui-hover.ogg',
     uiSelect: './assets/audio/kenney-ui/ui-select.ogg',
@@ -1769,6 +1769,7 @@
         reason: '',
         timer: 0,
         required: 0.15,
+        blockedPointers: new Set(),
       };
       this.lastDevice = hasCoarsePointer() ? 'touch' : 'keyboard';
       this.lastDeviceAt = performance.now();
@@ -1880,6 +1881,8 @@
         this.pointer.y = event.clientY;
         this.pointer.type = event.pointerType || 'mouse';
         if (this.neutralGate.active) {
+          this.trackNeutralPointer(event);
+          if (event.button === 0) this.pointer.down = true;
           this.setLastDevice(event.pointerType === 'touch' ? 'touch' : 'mouse');
           event.preventDefault();
           return;
@@ -1891,7 +1894,12 @@
       });
 
       window.addEventListener('pointerup', (event) => {
+        this.neutralGate.blockedPointers.delete(event.pointerId);
         if (event.button === 0) this.pointer.down = false;
+      });
+      window.addEventListener('pointercancel', (event) => {
+        this.neutralGate.blockedPointers.delete(event.pointerId);
+        this.pointer.down = false;
       });
       canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
@@ -2010,6 +2018,7 @@
 
       zone.addEventListener('pointerdown', (event) => {
         if (this.neutralGate.active) {
+          this.trackNeutralPointer(event);
           this.setLastDevice('touch');
           event.preventDefault();
           return;
@@ -2045,6 +2054,7 @@
       if (action === 'echo') {
         button.addEventListener('pointerdown', (event) => {
           if (this.neutralGate.active) {
+            this.trackNeutralPointer(event);
             this.setLastDevice('touch');
             event.preventDefault();
             return;
@@ -2076,6 +2086,7 @@
       }
       button.addEventListener('pointerdown', (event) => {
         if (this.neutralGate.active) {
+          this.trackNeutralPointer(event);
           this.setLastDevice('touch');
           event.preventDefault();
           return;
@@ -2260,6 +2271,7 @@
       this.neutralGate.active = true;
       this.neutralGate.reason = reason;
       this.neutralGate.timer = 0;
+      this.neutralGate.blockedPointers.clear();
       this.justPressed.clear();
       this.actions = { dash: false, echo: false };
       this.echoRequestQueued = null;
@@ -2271,8 +2283,14 @@
       this.neutralGate.active = false;
       this.neutralGate.reason = '';
       this.neutralGate.timer = 0;
+      this.neutralGate.blockedPointers.clear();
       this.justPressed.clear();
       this.actions = { dash: false, echo: false };
+    }
+
+    trackNeutralPointer(event) {
+      if (!event || event.pointerId === undefined || event.pointerId === null) return;
+      this.neutralGate.blockedPointers.add(event.pointerId);
     }
 
     isNeutralGateActive() {
@@ -2282,7 +2300,7 @@
     updateNeutralGate(dt = FIXED_DT) {
       if (!this.neutralGate.active) return false;
       const keysNeutral = this.keys.size === 0;
-      const pointerNeutral = !this.pointer.down;
+      const pointerNeutral = !this.pointer.down && this.neutralGate.blockedPointers.size === 0;
       const touchNeutral = Math.hypot(this.touchMove.x, this.touchMove.y, this.touchAim.x, this.touchAim.y) <= 0.05
         && !this.touchAim.active
         && !this.touchFire
@@ -9856,6 +9874,7 @@
             reason: input.neutralGate.reason,
             timer: Number(input.neutralGate.timer.toFixed(3)),
             required: input.neutralGate.required,
+            blockedPointers: input.neutralGate.blockedPointers.size,
           },
         },
         tutorial: tutorial ? {
@@ -9951,6 +9970,21 @@
             hp: Number(enemy.hp.toFixed(1)),
           })),
         }),
+        prepareFirstContactRewardEdge: (options = {}) => {
+          if (!player || gameState !== 'playing' || !runOnboarding?.active) return null;
+          const xpGain = Number(options.xpGain);
+          if (Number.isFinite(xpGain)) player.xpGain = Math.max(0.001, xpGain);
+          const xpMissing = Number.isFinite(Number(options.xpMissing)) ? Math.max(0.001, Number(options.xpMissing)) : 4;
+          player.xp = clamp(player.xpNext - xpMissing, 0, Math.max(0, player.xpNext - 0.001));
+          const pending = Math.max(0, Math.floor(Number(options.pendingLevelUps) || 0));
+          pendingLevelUps = pending;
+          return {
+            xp: Number(player.xp.toFixed(3)),
+            xpNext: Number(player.xpNext.toFixed(3)),
+            xpGain: Number(player.xpGain.toFixed(3)),
+            pendingLevelUps,
+          };
+        },
         tutorialNeutralGateProbe: () => runTutorialNeutralGateProbe(),
         dismissFieldCoach: () => { finishFieldCoach('dismissed', true); return window.echoRiftStatus.fieldCoach; },
         forceFieldCoachTimeout: () => { finishFieldCoach('timeout', false); return window.echoRiftStatus.fieldCoach; },

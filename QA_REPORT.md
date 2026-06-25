@@ -14,7 +14,7 @@
 | `node --check js/control-bindings.js` | 키보드 바인딩 헬퍼 구문 검사 |
 | `node --check sw.js` | 서비스워커 구문 검사 |
 | `node --check scripts/verify-7.1-first-contact.mjs` | 7.1 첫 접촉 verifier 구문 검사 |
-| `node scripts/verify-7.1-first-contact.mjs` | 신선 저장 첫 접촉, 페이싱 게이트, 보상 중복 방지, cleanup, 입력 중립화 행동 검사 |
+| `node scripts/verify-7.1-first-contact.mjs` | 신선 저장 첫 접촉, 페이싱 게이트, 보상 중복 방지, XP 경계값, cleanup, 입력 중립화 행동 검사 |
 | `node scripts/verify-7.0-render.mjs` | PRISM 글로우/프레임타임 품질/렌더 벤치 검사 |
 | `node scripts/verify-first-run-coach.mjs` | 기존 필드 코치 표시, 단계 전환, 숨김/타임아웃, 레이아웃 회귀 검사 |
 | `node scripts/verify-6.9.mjs` | 6.9 기능 연결, HTML ID 중복, manifest 파싱, 현재 릴리스 문자열 검사 |
@@ -30,9 +30,12 @@
 - 워밍업 표적 처치가 첫 처치로 기록되지만 혼자서는 강화 화면을 열지 않는지 확인
 - 전용 균열 표적에서 위상 균열이 열릴 때 첫 보상이 정확히 한 번 예약되고 강화 화면이 열리는지 확인
 - 반복 hit/QA 호출이 `rewardClaims`와 강화 선택지를 중복 증가시키지 않는지 확인
+- `player.xpGain > 1` 상태에서도 첫 접촉 보상이 정확히 한 선택지만 열고 추가 pending level을 남기지 않는지 확인
+- 이미 `pendingLevelUps > 0`인 예외 상태에서 첫 접촉 보상이 두 번째 레벨 예약을 만들지 않는지 확인
 - 강화 선택 뒤 게이트가 해제되고 정상 웨이브가 다시 스폰되는지 확인
 - timeout, dismiss, death 경로에서 임시 표적이 남지 않고 보상이 지급되지 않는지 확인
 - 튜토리얼 단계 전환 중 키보드, 포인터, 터치, 합성 게임패드 입력이 중립화되는지 확인
+- 중립 게이트가 켜진 뒤 새로 들어온 pointerdown이 pointerup 전까지 게이트를 유지하는지 확인
 
 ## `verify-7.0-render` 검사 범위
 
