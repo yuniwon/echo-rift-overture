@@ -115,7 +115,7 @@
   const EXPORT_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 1_000_000;
   const MAX_RUN_HISTORY = 20;
-  const GAME_VERSION = '7.0.3';
+  const GAME_VERSION = '7.1.0';
   const THIRD_PARTY_AUDIO_ASSETS = Object.freeze({
     uiHover: './assets/audio/kenney-ui/ui-hover.ogg',
     uiSelect: './assets/audio/kenney-ui/ui-select.ogg',
@@ -1761,8 +1761,15 @@
       this.echoLock = null;
       this.echoRequestQueued = null;
       this.gamepad = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, connected: false };
+      this.syntheticGamepad = null;
       this.previousButtons = [];
       this.uiAxisLatch = { x: 0, y: 0 };
+      this.neutralGate = {
+        active: false,
+        reason: '',
+        timer: 0,
+        required: 0.15,
+      };
       this.lastDevice = hasCoarsePointer() ? 'touch' : 'keyboard';
       this.lastDeviceAt = performance.now();
       document.body.dataset.inputDevice = this.lastDevice;
@@ -1803,6 +1810,13 @@
         if (capturePendingKeyBinding(event)) return;
         const key = event.key.toLowerCase();
         const token = eventKeyToken(event);
+        if (this.neutralGate.active) {
+          this.keys.add(token);
+          this.justPressed.delete(token);
+          this.setLastDevice('keyboard');
+          event.preventDefault();
+          return;
+        }
         const echoKey = keyMatchesAction('echoPrimary', token) || keyMatchesAction('echoSecondary', token);
         if (!this.keys.has(token)) {
           if (echoKey) {
@@ -1865,6 +1879,11 @@
         this.pointer.x = event.clientX;
         this.pointer.y = event.clientY;
         this.pointer.type = event.pointerType || 'mouse';
+        if (this.neutralGate.active) {
+          this.setLastDevice(event.pointerType === 'touch' ? 'touch' : 'mouse');
+          event.preventDefault();
+          return;
+        }
         if (event.button === 0) this.pointer.down = true;
         if (event.button === 2) this.actions.dash = true;
         this.setLastDevice(event.pointerType === 'touch' ? 'touch' : 'mouse');
@@ -1990,6 +2009,11 @@
       };
 
       zone.addEventListener('pointerdown', (event) => {
+        if (this.neutralGate.active) {
+          this.setLastDevice('touch');
+          event.preventDefault();
+          return;
+        }
         if (this.touchStickPointers[type] !== null) return;
         this.touchStickPointers[type] = event.pointerId;
         try { zone.setPointerCapture?.(event.pointerId); } catch (_) { /* capture may be unavailable */ }
@@ -2020,6 +2044,11 @@
       if (!button) return;
       if (action === 'echo') {
         button.addEventListener('pointerdown', (event) => {
+          if (this.neutralGate.active) {
+            this.setLastDevice('touch');
+            event.preventDefault();
+            return;
+          }
           if (this.touchEchoPointerId !== null) return;
           this.touchEchoPointerId = event.pointerId;
           this.setLastDevice('touch');
@@ -2046,6 +2075,11 @@
         return;
       }
       button.addEventListener('pointerdown', (event) => {
+        if (this.neutralGate.active) {
+          this.setLastDevice('touch');
+          event.preventDefault();
+          return;
+        }
         this.actions[action] = true;
         this.setLastDevice('touch');
         navigator.vibrate?.(12);
@@ -2055,7 +2089,7 @@
 
     updateGamepad() {
       const pads = navigator.getGamepads?.() || [];
-      const gp = [...pads].find(Boolean);
+      const gp = this.syntheticGamepad || [...pads].find(Boolean);
       if (!gp) {
         this.gamepad.moveX = this.gamepad.moveY = this.gamepad.aimX = this.gamepad.aimY = 0;
         this.gamepad.fire = false;
@@ -2070,6 +2104,11 @@
       this.gamepad.aimY = dead(gp.axes[3] || 0, 0.2);
       this.gamepad.fire = (gp.buttons[7]?.value || 0) > 0.25 || gp.buttons[2]?.pressed;
       const pressed = gp.buttons.map((button) => button.pressed || button.value > 0.5);
+      if (this.neutralGate.active) {
+        if (Math.hypot(this.gamepad.moveX, this.gamepad.moveY, this.gamepad.aimX, this.gamepad.aimY) > 0.2 || pressed.some(Boolean)) this.setLastDevice('gamepad');
+        this.previousButtons = pressed;
+        return;
+      }
       const rising = (index) => pressed[index] && !this.previousButtons[index];
       const inCombat = gameState === 'playing';
       const echoPressed = Boolean(pressed[1] || pressed[5]);
@@ -2117,6 +2156,7 @@
     }
 
     getMove() {
+      if (this.neutralGate.active) return { x: 0, y: 0, mag: 0 };
       let x = 0;
       let y = 0;
       if (this.actionDown('moveLeft')) x -= 1;
@@ -2131,6 +2171,7 @@
     }
 
     getAim() {
+      if (this.neutralGate.active) return player ? { x: Math.cos(player.angle), y: Math.sin(player.angle), active: false } : { x: 1, y: 0, active: false };
       let x = 0;
       let y = 0;
       let active = false;
@@ -2156,10 +2197,18 @@
     }
 
     isFiring(aimActive) {
+      if (this.neutralGate.active) return false;
       return this.pointer.down || this.touchFire || this.gamepad.fire || this.actionDown('fire') || (settings.autoFire && aimActive);
     }
 
     consumeDash() {
+      if (this.neutralGate.active) {
+        this.actions.dash = false;
+        this.clearActionPress('dash');
+        this.justPressed.delete('ShiftLeft');
+        this.justPressed.delete('ShiftRight');
+        return false;
+      }
       const keyDash = this.actionJustPressed('dash') || this.justPressed.has('ShiftLeft') || this.justPressed.has('ShiftRight');
       const result = keyDash || this.actions.dash;
       this.actions.dash = false;
@@ -2171,6 +2220,13 @@
     }
 
     consumeEcho() {
+      if (this.neutralGate.active) {
+        this.echoRequestQueued = null;
+        this.actions.echo = false;
+        this.clearActionPress('echoPrimary');
+        this.clearActionPress('echoSecondary');
+        return null;
+      }
       let request = this.echoRequestQueued;
       this.echoRequestQueued = null;
       if (!request && this.actions.echo) {
@@ -2200,6 +2256,48 @@
       this.justPressed.clear();
     }
 
+    beginNeutralGate(reason = 'transition') {
+      this.neutralGate.active = true;
+      this.neutralGate.reason = reason;
+      this.neutralGate.timer = 0;
+      this.justPressed.clear();
+      this.actions = { dash: false, echo: false };
+      this.echoRequestQueued = null;
+      this.cancelEcho(reason, false);
+      this.clearTouchState();
+    }
+
+    endNeutralGate() {
+      this.neutralGate.active = false;
+      this.neutralGate.reason = '';
+      this.neutralGate.timer = 0;
+      this.justPressed.clear();
+      this.actions = { dash: false, echo: false };
+    }
+
+    isNeutralGateActive() {
+      return Boolean(this.neutralGate.active);
+    }
+
+    updateNeutralGate(dt = FIXED_DT) {
+      if (!this.neutralGate.active) return false;
+      const keysNeutral = this.keys.size === 0;
+      const pointerNeutral = !this.pointer.down;
+      const touchNeutral = Math.hypot(this.touchMove.x, this.touchMove.y, this.touchAim.x, this.touchAim.y) <= 0.05
+        && !this.touchAim.active
+        && !this.touchFire
+        && this.touchStickPointers.move === null
+        && this.touchStickPointers.aim === null
+        && this.touchEchoPointerId === null;
+      const gamepadNeutral = Math.hypot(this.gamepad.moveX, this.gamepad.moveY, this.gamepad.aimX, this.gamepad.aimY) <= 0.12
+        && !this.gamepad.fire
+        && !this.previousButtons.some(Boolean);
+      if (keysNeutral && pointerNeutral && touchNeutral && gamepadNeutral) this.neutralGate.timer += dt;
+      else this.neutralGate.timer = 0;
+      if (this.neutralGate.timer >= this.neutralGate.required) this.endNeutralGate();
+      return this.neutralGate.active;
+    }
+
     reset() {
       this.keys.clear();
       this.justPressed.clear();
@@ -2211,6 +2309,8 @@
       this.echoHoldStartedAt = 0;
       this.echoLock = null;
       this.echoRequestQueued = null;
+      this.endNeutralGate();
+      this.syntheticGamepad = null;
     }
 
     rumble(strong = 0.4, duration = 80) {
@@ -2345,6 +2445,7 @@
   let tutorial = null;
   let fieldCoach = null;
   let fieldCoachFocusTarget = null;
+  let runOnboarding = null;
   let nextEntityId = 1;
   let wakeLock = null;
   let toastTimer = null;
@@ -2637,6 +2738,7 @@
   function clearWorld() {
     clearTimeout(waveBannerTimer);
     waveBannerTimer = null;
+    cleanupFirstContactOnboarding('world-clear');
     document.body.classList.remove('boss-intro-active', 'boss-materializing');
     UI.waveBanner?.classList.remove('boss-intro');
     for (const key of Object.keys(arrays)) arrays[key].length = 0;
@@ -2954,6 +3056,245 @@
     },
   ];
 
+  function createRunOnboardingState() {
+    return {
+      active: false,
+      phase: 'idle',
+      pacingGate: false,
+      rewardClaimed: false,
+      rewardClaims: 0,
+      reservedLevelUps: 0,
+      warmupTargetId: null,
+      phaseTargetId: null,
+      warmupRefilled: false,
+      startedAt: NaN,
+      releasedAt: NaN,
+      releaseReason: null,
+      firstCombatTargetSpawnAt: NaN,
+      firstKillAt: NaN,
+      firstEchoActivationAt: NaN,
+      firstPhaseRiftAt: NaN,
+      firstUpgradeOpenedAt: NaN,
+      firstUpgradeChosenAt: NaN,
+      fieldCoachCompletedAt: NaN,
+      pacingGateReleasedAt: NaN,
+      maxActiveEnemiesBeforeFirstUpgrade: 0,
+    };
+  }
+
+  function ensureRunOnboarding() {
+    if (!runOnboarding) runOnboarding = createRunOnboardingState();
+    return runOnboarding;
+  }
+
+  function firstWriteOnboardingMetric(key, value = gameTime) {
+    const state = ensureRunOnboarding();
+    if (!state.active && !state.pacingGate && !state.rewardClaimed) return;
+    if (!Number.isFinite(state[key])) state[key] = Number(value);
+  }
+
+  function firstContactTempTargets() {
+    return arrays.enemies.filter((enemy) => !enemy.dead && (enemy.firstContactWarmup || enemy.firstContactTarget));
+  }
+
+  function getRunOnboardingStatus() {
+    const state = ensureRunOnboarding();
+    return {
+      active: Boolean(state.active),
+      phase: state.phase,
+      pacingGate: Boolean(state.pacingGate),
+      firstContactRewardClaimed: Boolean(state.rewardClaimed),
+      rewardClaims: state.rewardClaims,
+      reservedLevelUps: state.reservedLevelUps,
+      warmupTargetId: state.warmupTargetId,
+      phaseTargetId: state.phaseTargetId,
+      releaseReason: state.releaseReason,
+      tempTargetsActive: firstContactTempTargets().length,
+      firstCombatTargetSpawnAt: Number.isFinite(state.firstCombatTargetSpawnAt) ? Number(state.firstCombatTargetSpawnAt.toFixed(2)) : null,
+      firstKillAt: Number.isFinite(state.firstKillAt) ? Number(state.firstKillAt.toFixed(2)) : null,
+      firstEchoActivationAt: Number.isFinite(state.firstEchoActivationAt) ? Number(state.firstEchoActivationAt.toFixed(2)) : null,
+      firstPhaseRiftAt: Number.isFinite(state.firstPhaseRiftAt) ? Number(state.firstPhaseRiftAt.toFixed(2)) : null,
+      firstUpgradeOpenedAt: Number.isFinite(state.firstUpgradeOpenedAt) ? Number(state.firstUpgradeOpenedAt.toFixed(2)) : null,
+      firstUpgradeChosenAt: Number.isFinite(state.firstUpgradeChosenAt) ? Number(state.firstUpgradeChosenAt.toFixed(2)) : null,
+      fieldCoachCompletedAt: Number.isFinite(state.fieldCoachCompletedAt) ? Number(state.fieldCoachCompletedAt.toFixed(2)) : null,
+      pacingGateReleasedAt: Number.isFinite(state.pacingGateReleasedAt) ? Number(state.pacingGateReleasedAt.toFixed(2)) : null,
+      maxActiveEnemiesBeforeFirstUpgrade: state.maxActiveEnemiesBeforeFirstUpgrade,
+    };
+  }
+
+  function firstContactGateActive() {
+    return Boolean(runOnboarding?.pacingGate && gameState === 'playing' && !tutorial?.active && !currentWave?.isBoss);
+  }
+
+  function updateRunOnboardingPressure() {
+    if (!runOnboarding?.active || Number.isFinite(runOnboarding.firstUpgradeOpenedAt)) return;
+    const activeEnemies = arrays.enemies.filter((enemy) => !enemy.dead && !enemy.trainingDummy && enemy.spawnTime <= 0.1).length;
+    runOnboarding.maxActiveEnemiesBeforeFirstUpgrade = Math.max(runOnboarding.maxActiveEnemiesBeforeFirstUpgrade, activeEnemies);
+  }
+
+  function firstContactPosition(distance = 280, side = 1) {
+    if (!player) return { x: WORLD.w / 2, y: WORLD.h / 2 };
+    const angle = player.angle || 0;
+    const lateral = angle + Math.PI / 2;
+    return {
+      x: clamp(player.x + Math.cos(angle) * distance + Math.cos(lateral) * 72 * side, WORLD.margin + 100, WORLD.w - WORLD.margin - 100),
+      y: clamp(player.y + Math.sin(angle) * distance + Math.sin(lateral) * 72 * side, WORLD.margin + 100, WORLD.h - WORLD.margin - 100),
+    };
+  }
+
+  function retireFirstContactEnemy(enemy) {
+    if (!enemy) return;
+    enemy.noReward = true;
+    enemy.dead = true;
+    enemy.fieldCoachFocus = false;
+    enemy.firstContactWarmup = false;
+    enemy.firstContactTarget = false;
+  }
+
+  function cleanupFirstContactTargets() {
+    for (const enemy of arrays.enemies) {
+      if (enemy.firstContactWarmup || enemy.firstContactTarget) retireFirstContactEnemy(enemy);
+    }
+    if (fieldCoachFocusTarget?.firstContact) fieldCoachFocusTarget = null;
+  }
+
+  function cleanupFirstContactOnboarding(reason = 'cleanup') {
+    const state = ensureRunOnboarding();
+    cleanupFirstContactTargets();
+    if (state.active || state.pacingGate) {
+      state.active = false;
+      state.pacingGate = false;
+      state.phase = reason;
+      state.releaseReason = reason;
+      if (!Number.isFinite(state.pacingGateReleasedAt)) state.pacingGateReleasedAt = gameTime;
+    }
+  }
+
+  function beginFirstContactOnboarding() {
+    const state = ensureRunOnboarding();
+    state.active = true;
+    state.phase = 'record';
+    state.pacingGate = true;
+    state.rewardClaimed = false;
+    state.rewardClaims = 0;
+    state.reservedLevelUps = 0;
+    state.warmupTargetId = null;
+    state.phaseTargetId = null;
+    state.warmupRefilled = false;
+    state.startedAt = gameTime;
+    state.releasedAt = NaN;
+    state.releaseReason = null;
+    state.firstCombatTargetSpawnAt = NaN;
+    state.firstKillAt = NaN;
+    state.firstEchoActivationAt = NaN;
+    state.firstPhaseRiftAt = NaN;
+    state.firstUpgradeOpenedAt = NaN;
+    state.firstUpgradeChosenAt = NaN;
+    state.fieldCoachCompletedAt = NaN;
+    state.pacingGateReleasedAt = NaN;
+    state.maxActiveEnemiesBeforeFirstUpgrade = 0;
+    if (currentWave) currentWave.spawnTimer = Math.max(currentWave.spawnTimer || 0, 9999);
+    return state;
+  }
+
+  function releaseFirstContactGate(reason = 'upgrade-selected') {
+    if (!runOnboarding?.pacingGate) return false;
+    runOnboarding.pacingGate = false;
+    runOnboarding.active = false;
+    runOnboarding.phase = 'released';
+    runOnboarding.releaseReason = reason;
+    runOnboarding.releasedAt = gameTime;
+    firstWriteOnboardingMetric('pacingGateReleasedAt');
+    cleanupFirstContactTargets();
+    if (currentWave && !currentWave.isBoss) currentWave.spawnTimer = Math.min(currentWave.spawnTimer || 0.75, rand(0.6, 0.9));
+    return true;
+  }
+
+  function spawnFirstContactWarmupTarget() {
+    if (!runOnboarding?.active || !player || gameState !== 'playing') return null;
+    const existing = runOnboarding.warmupTargetId
+      ? arrays.enemies.find((enemy) => enemy.id === runOnboarding.warmupTargetId && !enemy.dead)
+      : null;
+    if (existing) return existing;
+    const pos = firstContactPosition(275, -1);
+    const target = spawnEnemy('wisp', pos.x, pos.y, true);
+    if (!target) return null;
+    target.spawnTime = 0;
+    target.firstContactWarmup = true;
+    target.fieldCoachPractice = true;
+    target.hp = target.maxHp = Math.max(62, Math.round((player.damage || 20) * 3.2));
+    target.speed = 0;
+    target.damage = 0;
+    target.attackMult = 0;
+    target.shootTimer = 9999;
+    target.xp = 5;
+    target.score = 35;
+    runOnboarding.warmupTargetId = target.id;
+    firstWriteOnboardingMetric('firstCombatTargetSpawnAt');
+    createFloater(target.x, target.y - target.radius - 18, '워밍업 표적', '#63eaff', 12);
+    enemyGrid.rebuild(arrays.enemies);
+    return target;
+  }
+
+  function spawnFirstContactPhaseTarget() {
+    if (!runOnboarding?.active || !player || gameState !== 'playing') return null;
+    const existing = runOnboarding.phaseTargetId
+      ? arrays.enemies.find((enemy) => enemy.id === runOnboarding.phaseTargetId && !enemy.dead)
+      : null;
+    if (existing) return existing;
+    const pos = firstContactPosition(330, 1);
+    const target = spawnEnemy('gunner', pos.x, pos.y, true);
+    if (!target) return null;
+    target.spawnTime = 0;
+    target.firstContactTarget = true;
+    target.fieldCoachFocus = true;
+    target.fieldCoachPractice = true;
+    target.hp = target.maxHp = Math.max(520, Math.round((player.damage || 20) * 18));
+    target.speed = 0;
+    target.damage = 0;
+    target.attackMult = 0;
+    target.shootTimer = 9999;
+    target.noReward = true;
+    target.qaEchoStat = {
+      id: nextEntityId++,
+      damage: 0,
+      dotDamage: 0,
+      phaseRifts: 0,
+      phaseRiftBonusDamage: 0,
+      kills: 0,
+      hits: 0,
+      shots: 1,
+      queued: false,
+    };
+    runOnboarding.phaseTargetId = target.id;
+    fieldCoachFocusTarget = { enemyId: target.id, spawned: true, createdAt: gameTime, firstContact: true };
+    createFloater(target.x, target.y - target.radius - 24, '첫 균열 표적', '#ffe39a', 13);
+    enemyGrid.rebuild(arrays.enemies);
+    return target;
+  }
+
+  function claimFirstContactReward(enemy) {
+    if (!runOnboarding?.active || !enemy?.firstContactTarget || runOnboarding.rewardClaimed) return false;
+    runOnboarding.rewardClaimed = true;
+    runOnboarding.rewardClaims += 1;
+    runOnboarding.phase = 'rewarded';
+    firstWriteOnboardingMetric('firstPhaseRiftAt');
+    const pendingBefore = pendingLevelUps;
+    if (pendingLevelUps <= 0 && player) {
+      const needed = Math.max(0, player.xpNext - player.xp);
+      if (needed <= 0) pendingLevelUps = Math.max(pendingLevelUps, 1);
+      else gainXP((needed + 0.001) / Math.max(0.001, player.xpGain || 1));
+    }
+    if (pendingLevelUps > pendingBefore) runOnboarding.reservedLevelUps += Math.min(1, pendingLevelUps - pendingBefore);
+    else if (pendingLevelUps > 0) runOnboarding.reservedLevelUps = Math.max(runOnboarding.reservedLevelUps, 1);
+    retireFirstContactEnemy(enemy);
+    createShockwave(enemy.x, enemy.y, '#ffd166', enemy.radius + 150, 0.62, 4);
+    createFloater(enemy.x, enemy.y - enemy.radius - 22, '강화 선택 개방', '#ffe39a', 16);
+    showToast('첫 위상 균열 성공 · 강화 선택 개방', 2600);
+    finishFieldCoach('complete', true);
+    return true;
+  }
+
   function getFieldCoachStatus() {
     const active = Boolean(fieldCoach?.active);
     const step = active ? clamp(fieldCoach.step || 0, 0, fieldCoachSteps.length - 1) : -1;
@@ -2966,6 +3307,7 @@
       elapsed: Number((fieldCoach?.elapsed || 0).toFixed(2)),
       visible: Boolean(UI.fieldCoach && !UI.fieldCoach.classList.contains('hidden')),
       reason: fieldCoach?.reason || null,
+      firstContact: Boolean(fieldCoach?.firstContact),
       focusTarget: getFieldCoachFocusStatus(),
     };
   }
@@ -2993,6 +3335,7 @@
 
   function spawnFieldCoachFocusTarget() {
     if (!fieldCoach?.active || fieldCoach.step !== 2 || !player || gameState !== 'playing') return null;
+    if (fieldCoach.firstContact) return spawnFirstContactPhaseTarget();
     const existing = fieldCoachFocusTarget?.enemyId
       ? arrays.enemies.find((candidate) => candidate.id === fieldCoachFocusTarget.enemyId && !candidate.dead)
       : null;
@@ -3046,7 +3389,12 @@
     fieldCoach.copySignature = '';
     fieldCoach.startEchoActivations = echoActivations;
     fieldCoach.startPhaseRifts = phaseRiftProcs;
-    if (fieldCoach.step === 2) spawnFieldCoachFocusTarget();
+    if (fieldCoach.firstContact && runOnboarding?.active) {
+      runOnboarding.phase = fieldCoachSteps[fieldCoach.step]?.key || 'active';
+      if (fieldCoach.step === 0) spawnFirstContactWarmupTarget();
+      if (fieldCoach.step === 2) spawnFirstContactPhaseTarget();
+      else clearFieldCoachFocusTarget();
+    } else if (fieldCoach.step === 2) spawnFieldCoachFocusTarget();
     else clearFieldCoachFocusTarget();
     refreshFieldCoachCopy(true);
     if (UI.fieldCoachProgressBar) UI.fieldCoachProgressBar.style.width = '0%';
@@ -3058,6 +3406,8 @@
     if (saveData.fieldCoachSeen && !options.force) return false;
     clearFieldCoachFocusTarget();
     hideWaveBanner();
+    const firstContact = Boolean(options.firstContact);
+    if (firstContact) beginFirstContactOnboarding();
     fieldCoach = {
       active: true,
       step: 0,
@@ -3065,6 +3415,7 @@
       stepElapsed: 0,
       progress: 0,
       reason: 'active',
+      firstContact,
       startEchoActivations: echoActivations,
       startPhaseRifts: phaseRiftProcs,
       copySignature: '',
@@ -3077,11 +3428,18 @@
 
   function finishFieldCoach(reason = 'complete', markSeen = true) {
     if (!fieldCoach) return false;
+    const wasFirstContact = Boolean(fieldCoach.firstContact);
     fieldCoach.active = false;
     fieldCoach.reason = reason;
     UI.fieldCoach?.classList.add('hidden');
     delete document.body.dataset.fieldCoach;
     clearFieldCoachFocusTarget();
+    if (wasFirstContact) {
+      if (reason === 'complete') {
+        firstWriteOnboardingMetric('fieldCoachCompletedAt');
+        if (runOnboarding) runOnboarding.phase = runOnboarding.rewardClaimed ? 'awaitingUpgrade' : 'complete';
+      } else cleanupFirstContactOnboarding(reason);
+    }
     if (markSeen && saveData.fieldCoachSeen !== true) {
       saveData.fieldCoachSeen = true;
       saveJSON(SAVE_KEY, saveData);
@@ -3104,7 +3462,12 @@
     let progress = 0;
     if (fieldCoach.step === 0) {
       const analysis = analyzeEchoBuffer();
-      progress = Math.min(clamp(analysis.coverage / 0.72, 0, 1), clamp(analysis.shots / 3, 0, 1));
+      const recorded = Math.min(clamp(analysis.coverage / 0.72, 0, 1), clamp(analysis.shots / 3, 0, 1));
+      if (fieldCoach.firstContact) {
+        spawnFirstContactWarmupTarget();
+        const killed = Number.isFinite(runOnboarding?.firstKillAt) ? 1 : 0;
+        progress = Math.min(recorded, killed);
+      } else progress = recorded;
     } else if (fieldCoach.step === 1) {
       if (echoActivations > fieldCoach.startEchoActivations) progress = 1;
       else if (input.isEchoLocked()) progress = 0.68;
@@ -3112,7 +3475,8 @@
       else progress = player.echoCooldown <= 0.05 ? 0.22 : 0.08;
     } else {
       spawnFieldCoachFocusTarget();
-      if (phaseRiftProcs > fieldCoach.startPhaseRifts) progress = 1;
+      if (fieldCoach.firstContact && runOnboarding?.rewardClaimed) progress = 1;
+      else if (!fieldCoach.firstContact && phaseRiftProcs > fieldCoach.startPhaseRifts) progress = 1;
       else if (arrays.enemies.some((enemy) => !enemy.dead && enemy.phaseRiftTime > 0)) progress = 0.88;
       else progress = Math.min(0.58, 0.18 + clamp(fieldCoach.stepElapsed / 24, 0, 1) * 0.4);
     }
@@ -3364,8 +3728,14 @@
     tutorial.stepElapsed = 0;
     tutorial.originX = player.x;
     tutorial.originY = player.y;
+    player.vx = player.vy = 0;
+    player.dashTimer = 0;
+    player.shotThisStep = false;
+    player.dashedThisStep = false;
+    input.beginNeutralGate('tutorial-step');
     tutorial.startEchoActivations = echoActivations;
     tutorial.copySignature = '';
+    tutorial.progress = 0;
     const total = (tutorial.sequence || sequence).length;
     UI.tutorialStepLabel.textContent = `ECHO LAB · ${tutorial.sequenceIndex + 1}/${total}`;
     refreshTutorialCopy(true);
@@ -3397,6 +3767,7 @@
 
   function startEchoTutorial(mode = 'basic', options = {}) {
     if (!player || !currentWave) return;
+    cleanupFirstContactOnboarding('training-entry');
     const sequence = tutorialSequence(mode);
     tutorial = {
       active: true, mode, sequence: [...sequence], sequenceIndex: 0, step: sequence[0], stepElapsed: 0, originX: player.x, originY: player.y,
@@ -3429,6 +3800,7 @@
   function finishEchoTutorial(skipped = false) {
     if (!tutorial?.active) return;
     tutorial.active = false;
+    input.endNeutralGate();
     UI.tutorialCoach.classList.add('hidden');
     UI.replayVerified?.classList.add('hidden');
     UI.syncSuccess?.classList.add('hidden');
@@ -3470,7 +3842,7 @@
     if (currentWave) {
       currentWave.elapsed = 0;
       currentWave.threat = 1;
-      currentWave.spawnTimer = 1.05;
+      currentWave.spawnTimer = tutorial?.fieldCoachAfter && !saveData.fieldCoachSeen ? 9999 : 1.05;
       currentWave.completed = false;
     }
     camera.x = player.x;
@@ -3484,12 +3856,18 @@
       : '기본 훈련 완료 · 고급 잔향 훈련은 메뉴에서 언제든 연습할 수 있습니다';
     showToast(skipped ? '훈련을 종료했습니다 · 실제 시간선 진입' : doneText, 3400);
     if (tutorial?.fieldCoachAfter && !saveData.fieldCoachSeen) {
-      window.setTimeout(() => gameState === 'playing' && startFieldCoach(), 1200);
+      window.setTimeout(() => gameState === 'playing' && startFieldCoach({ firstContact: true }), 320);
     }
   }
 
   function updateEchoTutorial(dt) {
     if (!tutorial?.active || !player) return;
+    if (input.isNeutralGateActive()) {
+      tutorial.progress = 0;
+      UI.tutorialProgressBar.style.width = '0%';
+      UI.tutorialProgressText.textContent = '0%';
+      return;
+    }
     tutorial.stepElapsed += dt;
     refreshTutorialCopy();
     let progress = 0;
@@ -3534,6 +3912,7 @@
         : Math.min(0.9, clamp(tutorial.stepElapsed / 7, 0, 1));
     }
     const percent = Math.round(progress * 100);
+    tutorial.progress = progress;
     UI.tutorialProgressBar.style.width = `${percent}%`;
     UI.tutorialProgressText.textContent = `${percent}%`;
     if (progress < 1) return;
@@ -4607,6 +4986,7 @@
 
   function openUpgradeScreen() {
     if (!player || gameState !== 'playing' || pendingLevelUps <= 0) return;
+    if (runOnboarding?.rewardClaimed && !Number.isFinite(runOnboarding.firstUpgradeOpenedAt)) firstWriteOnboardingMetric('firstUpgradeOpenedAt');
     input.cancelEcho('upgrade', false);
     input.echoRequestQueued = null;
     lockedUpgradeIds.clear();
@@ -4648,6 +5028,10 @@
     showScreen(null);
     document.body.classList.remove('choice-open', 'boss-intro-active', 'boss-materializing');
     gameState = 'playing';
+    if (runOnboarding?.rewardClaimed && !Number.isFinite(runOnboarding.firstUpgradeChosenAt)) {
+      firstWriteOnboardingMetric('firstUpgradeChosenAt');
+      releaseFirstContactGate('upgrade-selected');
+    }
     updateTouchControlsVisibility();
     audio.setGameState(true);
     const rarityCallout = rarityIndex(rarityKey) >= 4 ? `${quality.label.split(' · ')[1]} 동기화 · ` : '';
@@ -5207,6 +5591,7 @@
     echoReportTimer = null;
     tutorial = null;
     fieldCoach = null;
+    runOnboarding = createRunOnboardingState();
     clearFieldCoachFocusTarget();
     currentWave = null;
     UI.echoReport?.classList.add('hidden');
@@ -5244,7 +5629,9 @@
       // race the tutorial setup, even on a heavily delayed first frame.
       startEchoTutorial(tutorialMode, { fieldCoachAfter: wantsFieldCoachAfterTutorial });
     } else if (wantsFieldCoachNow) {
-      window.setTimeout(() => gameState === 'playing' && startFieldCoach({ force: options?.fieldCoach === true }), 900);
+      const firstContactNow = options?.fieldCoach !== true;
+      if (firstContactNow && currentWave) currentWave.spawnTimer = 9999;
+      window.setTimeout(() => gameState === 'playing' && startFieldCoach({ force: options?.fieldCoach === true, firstContact: firstContactNow }), firstContactNow ? 320 : 900);
     } else if (Object.values(saveData.meta).some((level) => level > 0)) {
       window.setTimeout(() => gameState === 'playing' && showToast('영구 기억이 적용되었습니다 · 이전 실패가 출발선을 밀어 올립니다', 2600), 1100);
     } else {
@@ -5309,6 +5696,11 @@
         beginBossIntro(waveInfo(currentWave.number), currentWave.modifier, currentWave.modifier?.name || '보스 규칙');
         return;
       }
+    }
+
+    if (firstContactGateActive()) {
+      currentWave.clearTimer = 0;
+      return;
     }
 
     currentWave.elapsed += dt;
@@ -5970,6 +6362,7 @@
         || tutorial.replayLockedSignature === stat.snapshotSignature;
     }
     echoActivations++;
+    firstWriteOnboardingMetric('firstEchoActivationAt');
     while (arrays.echoes.length > player.maxEchoes) {
       const removed = arrays.echoes.shift();
       if (removed?.stat) queueEchoReport(removed.stat);
@@ -6655,6 +7048,7 @@
     enemy.phaseRiftLastEchoStat = null;
     phaseRiftProcs++;
     if (echoStat) echoStat.phaseRifts = (echoStat.phaseRifts || 0) + 1;
+    firstWriteOnboardingMetric('firstPhaseRiftAt');
     if (phaseRiftProcs === 1) showToast('위상 균열 · 1.6초 동안 대상이 받는 피해 +22%', 2600);
 
     createShockwave(enemy.x, enemy.y, '#ffd166', enemy.radius + 92, 0.42, 3.2);
@@ -6673,6 +7067,7 @@
     createFloater(enemy.x, enemy.y - enemy.radius - 16, 'PHASE RIFT', '#ffe39a', 14);
     audio.phaseRift(enemy.x);
     input.rumble(0.26, 72);
+    if (enemy.firstContactTarget) claimFirstContactReward(enemy);
     return true;
   }
 
@@ -6808,6 +7203,7 @@
 
   function onEnemyDeath(enemy) {
     const noReward = enemy.noReward || false;
+    if (!noReward && !enemy.trainingDummy && !Number.isFinite(runOnboarding?.firstKillAt)) firstWriteOnboardingMetric('firstKillAt');
     if (!noReward && enemy.lastHitFromEcho && enemy.lastEchoStat) {
       enemy.lastEchoStat.kills++;
       echoKillsTotal++;
@@ -7176,6 +7572,7 @@
   function updateGame(dt) {
     if (gameState !== 'playing' || !player) return;
     input.updateGamepad();
+    input.updateNeutralGate(dt);
     if (bossCutsceneActive()) {
       updateBossCutscene(dt);
       updateEffects(dt);
@@ -7196,6 +7593,7 @@
     updateEnemyBullets(dt);
     updatePickups(dt);
     resolveEnemyDeaths();
+    updateRunOnboardingPressure();
     updateEffects(dt);
     updateEchoReports();
     updateWave(dt);
@@ -7259,6 +7657,7 @@
     if (gameState === 'gameover') return;
     input.cancelEcho('gameover', false);
     input.echoRequestQueued = null;
+    cleanupFirstContactOnboarding('death');
     const isNewBest = score > saveData.bestScore;
     gameState = 'gameover';
     document.body.classList.remove('game-running', 'choice-open', 'boss-intro-active', 'boss-materializing');
@@ -7304,6 +7703,7 @@
     if (gameState !== 'playing') return;
     input.cancelEcho('victory', false);
     input.echoRequestQueued = null;
+    cleanupFirstContactOnboarding('victory');
     gameState = 'victory';
     document.body.classList.remove('game-running', 'choice-open', 'boss-intro-active', 'boss-materializing');
     audio.setGameState(false);
@@ -9278,6 +9678,74 @@
     }
   }
 
+  function runTutorialNeutralGateProbe() {
+    if (!player || !tutorial?.active) startGame({ training: true });
+    if (!tutorial?.active || !player) return null;
+    const binding = normalizeKeyBindingMap(settings.keyBindings);
+    const moveRight = binding.moveRight || 'KeyD';
+    const result = {};
+
+    input.reset();
+    input.keys.add(moveRight);
+    input.beginNeutralGate('qa-keyboard');
+    input.updateNeutralGate(0.08);
+    result.keyboard = { blockedMoveMag: input.getMove().mag };
+    input.keys.clear();
+    input.updateNeutralGate(0.16);
+    input.keys.add(moveRight);
+    result.keyboard.releasedMoveMag = input.getMove().mag;
+    input.reset();
+
+    input.pointer.down = true;
+    input.beginNeutralGate('qa-pointer');
+    input.updateNeutralGate(0.08);
+    result.pointer = { blockedFire: input.isFiring(true) };
+    input.pointer.down = false;
+    input.updateNeutralGate(0.16);
+    input.pointer.down = true;
+    result.pointer.releasedFire = input.isFiring(true);
+    input.pointer.down = false;
+    input.reset();
+
+    input.touchMove = { x: 1, y: 0 };
+    input.beginNeutralGate('qa-touch');
+    input.updateNeutralGate(0.08);
+    result.touch = { blockedMoveMag: input.getMove().mag };
+    input.updateNeutralGate(0.16);
+    input.touchMove = { x: 1, y: 0 };
+    result.touch.releasedMoveMag = input.getMove().mag;
+    input.reset();
+
+    const buttons = Array.from({ length: 10 }, () => ({ pressed: false, value: 0 }));
+    input.syntheticGamepad = { axes: [1, 0, 0, 0], buttons };
+    input.updateGamepad();
+    input.beginNeutralGate('qa-gamepad');
+    input.updateNeutralGate(0.08);
+    result.gamepad = { blockedMoveMag: input.getMove().mag };
+    input.syntheticGamepad = { axes: [0, 0, 0, 0], buttons };
+    input.updateGamepad();
+    input.updateNeutralGate(0.16);
+    input.syntheticGamepad = { axes: [1, 0, 0, 0], buttons };
+    input.updateGamepad();
+    result.gamepad.releasedMoveMag = input.getMove().mag;
+    input.syntheticGamepad = null;
+    input.reset();
+
+    setTutorialStep(2);
+    input.beginNeutralGate('qa-tutorial');
+    player.dashedThisStep = true;
+    updateEchoTutorial(FIXED_DT);
+    result.tutorial = { progressWhileBlocked: tutorial.progress || 0 };
+    input.keys.clear();
+    player.dashedThisStep = false;
+    input.updateNeutralGate(0.16);
+    player.dashedThisStep = true;
+    updateEchoTutorial(FIXED_DT);
+    result.tutorial.progressAfterRelease = tutorial?.progress || 0;
+    input.reset();
+    return result;
+  }
+
   // Read-only diagnostics make the offline build verifiable without exposing mutable state.
   Object.defineProperty(window, 'echoRiftStatus', {
     get() {
@@ -9298,6 +9766,8 @@
         }),
         modifierStats: currentWave?.modifier ? { baseId:currentWave.modifier.baseId, hp:Number(currentWave.modifier.hp.toFixed(3)), damage:Number(currentWave.modifier.damage.toFixed(3)), speed:Number(currentWave.modifier.speed.toFixed(3)), spawn:Number(currentWave.modifier.spawn.toFixed(3)), count:Number(currentWave.modifier.count.toFixed(3)), bulletSpeed:Number(currentWave.modifier.bulletSpeed.toFixed(3)), fireRate:Number(currentWave.modifier.fireRate.toFixed(3)), eliteChance:Number(currentWave.modifier.eliteChance.toFixed(3)), xp:Number(currentWave.modifier.xp.toFixed(3)), core:Number(currentWave.modifier.core.toFixed(3)) } : null,
         threat: currentWave ? Number((currentWave.threat || 1).toFixed(2)) : 0,
+        waveElapsed: currentWave ? Number((currentWave.elapsed || 0).toFixed(2)) : 0,
+        spawnRemaining: currentWave ? Math.max(0, Math.floor(currentWave.spawnRemaining || 0)) : 0,
         bossIntro: currentWave?.isBoss ? (() => {
           const boss = arrays.enemies.find((enemy) => !enemy.dead && enemy.type === 'boss');
           return {
@@ -9373,6 +9843,7 @@
           cooldown: PHASE_RIFT_COOLDOWN,
         },
         fieldCoach: getFieldCoachStatus(),
+        onboarding: getRunOnboardingStatus(),
         input: {
           lastDevice: input.lastDevice,
           resolvedDevice: resolvedInputDeviceFamily(),
@@ -9380,6 +9851,12 @@
           touchControlsMode: settings.touchControlsMode,
           echoKeyboardKeys: input.echoKeyboardKeys.size,
           touchEchoPointerId: input.touchEchoPointerId,
+          neutralGate: {
+            active: input.isNeutralGateActive(),
+            reason: input.neutralGate.reason,
+            timer: Number(input.neutralGate.timer.toFixed(3)),
+            required: input.neutralGate.required,
+          },
         },
         tutorial: tutorial ? {
           active: Boolean(tutorial.active),
@@ -9399,6 +9876,8 @@
           syncSuccess: Boolean(tutorial.syncSuccess),
           syncWindow: tutorialSyncWindow(),
           syncFailures: tutorial.syncFailures || 0,
+          progress: Number((tutorial.progress || 0).toFixed(3)),
+          neutralGateActive: input.isNeutralGateActive(),
           nonTrainingEnemies: arrays.enemies.filter((enemy) => !enemy.dead && !enemy.trainingDummy).length,
         } : null,
         echoRecorder: player ? {
@@ -9454,7 +9933,25 @@
           startGame({ fieldCoach: true });
           return window.echoRiftStatus.fieldCoach;
         },
+        startFirstContactProbe: () => {
+          saveData.tutorialSeen = true;
+          saveData.fieldCoachSeen = false;
+          saveJSON(SAVE_KEY, saveData);
+          startGame();
+          return window.echoRiftStatus.onboarding;
+        },
         fieldCoachStatus: () => window.echoRiftStatus.fieldCoach,
+        firstContactTargets: () => ({
+          warmupId: runOnboarding?.warmupTargetId || null,
+          phaseTargetId: runOnboarding?.phaseTargetId || null,
+          active: firstContactTempTargets().map((enemy) => ({
+            id: enemy.id,
+            warmup: Boolean(enemy.firstContactWarmup),
+            phase: Boolean(enemy.firstContactTarget),
+            hp: Number(enemy.hp.toFixed(1)),
+          })),
+        }),
+        tutorialNeutralGateProbe: () => runTutorialNeutralGateProbe(),
         dismissFieldCoach: () => { finishFieldCoach('dismissed', true); return window.echoRiftStatus.fieldCoach; },
         forceFieldCoachTimeout: () => { finishFieldCoach('timeout', false); return window.echoRiftStatus.fieldCoach; },
         activateEcho: () => { if (!player || gameState !== 'playing') return false; player.echoCooldown = 0; activateEcho(); return arrays.echoes.length > 0; },
@@ -9732,6 +10229,7 @@
         },
         setWave: (number) => {
           if (!player) return false;
+          cleanupFirstContactOnboarding('qa-wave-change');
           arrays.enemies.length = 0;
           while (arrays.enemyBullets.length) recycleEnemyBullet(arrays.enemyBullets.length - 1);
           arrays.lasers.length = 0;

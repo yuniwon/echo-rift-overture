@@ -1,5 +1,5 @@
 ECHO RIFT: OVERTURE
-Version 7.0.3
-Codename: PRISM FOCUS
-Build date: 2026-06-24
-Focus: first-run core feel. The first normal run now shows a concise non-blocking field coach for recording a combat-ready echo, deploying it, and pairing present/echo hits into a phase rift. Rendering, combat balance, tutorial step counts, and offline dependency boundaries remain unchanged.
+Version 7.1.0
+Codename: FIRST CONTACT
+Build date: 2026-06-25
+Focus: first-minute onboarding. A fresh run now pauses normal wave pressure until the player kills a safe warmup enemy, records a combat echo, deploys it, opens a first phase rift on a dedicated target, and chooses the first upgrade. Rendering, combat balance, save keys, tutorial step counts, and offline dependency boundaries remain unchanged.
