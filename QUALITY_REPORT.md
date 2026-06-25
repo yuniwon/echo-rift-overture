@@ -1,8 +1,17 @@
 # ECHO RIFT Quality Loop Report
 
-## 현재 상태 — 7.0.3 PRISM FOCUS
+## 현재 상태 — 7.1.0 FIRST CONTACT
 
-Iteration 3에서 전투 렌더링 성능 회복을 위해 hot path `ctx.shadowBlur` 글로우를 사전 렌더 글로우 스프라이트로 교체하고, 자동 품질 강등을 frame-time 기반으로 교정했다. 7.0.1 에셋 패스에서는 Kenney CC0 에셋의 작은 로컬 부분 집합을 사운드/시각 피드백 레이어로 추가했다. 7.0.2 FIELD 패스에서는 첫 일반 런의 초반 60초가 `기록하기 → 잔향 호출 → 같은 적 협공`으로 읽히도록 비차단 전투 코치를 추가했다. 7.0.3 FOCUS 패스에서는 협공 표적 표시, 시간 초과 재시도, 짧은 화면 가독성 하한, 구형 릴리스 게이트 정리를 추가했다. 현재 자동 검증 기준은 `scripts/verify-first-run-coach.mjs`, `scripts/verify-7.0-render.mjs`, `scripts/verify-asset-pack.mjs`, `scripts/verify-ui-readability.mjs`, `scripts/verify-route-layout.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+Iteration 4에서 첫 일반 런의 초반 60초가 실제 행동 보상으로 닫히도록 FIRST CONTACT 패스를 추가했다. 기본 훈련 직후 정상 웨이브 압력을 잠시 멈추고, 안전한 워밍업 처치, 전투용 3초 기록, 잔향 호출, 전용 표적 위상 균열, 첫 강화 선택이 하나의 원인-결과 사슬로 이어진다. 튜토리얼 단계 전환에는 키보드·포인터·터치·게임패드 중립 게이트를 추가해 이전 입력 carryover가 다음 단계 성공으로 읽히지 않게 했다. 현재 자동 검증 기준은 `scripts/verify-7.1-first-contact.mjs`, `scripts/verify-first-run-coach.mjs`, `scripts/verify-7.0-render.mjs`, `scripts/verify-asset-pack.mjs`, `scripts/verify-ui-readability.mjs`, `scripts/verify-route-layout.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`이다.
+
+## 7.1.0 First Contact Pass
+
+- 첫 접촉 게이트: `fieldCoachSeen`이 없는 첫 일반 런에서만 정상 웨이브 `elapsed/threat/spawnRemaining`을 첫 강화 선택 전까지 정지한다.
+- 워밍업 표적: 공격하지 않는 summoned wisp를 생성해 실제 처치와 소량 XP를 경험하게 하되, 웨이브 클리어에는 포함하지 않는다.
+- 전용 균열 표적: 보상 없는 gunner를 `firstContactTarget`으로 생성하고, 이 표적에서 위상 균열이 열릴 때만 부족한 XP를 지급해 첫 강화 화면을 한 번 연다.
+- 보상 idempotency: `rewardClaims`, `reservedLevelUps`, `firstContactRewardClaimed`를 통해 반복 hit/QA/pause 경로에서 두 번째 보상이 생기지 않도록 검증한다.
+- 입력 중립화: 튜토리얼 단계 전환 중 입력이 모두 중립인 상태로 0.15초 유지될 때까지 진행률과 이동/사격/대시/잔향을 막는다.
+- 검증: `verify-7.1-first-contact`가 신선 저장 첫 접촉, 게이트 정지/해제, timeout/dismiss/death cleanup, 키보드·포인터·터치·합성 게임패드 중립화를 Playwright로 확인한다.
 
 ## 7.0.3 Focus Pass
 

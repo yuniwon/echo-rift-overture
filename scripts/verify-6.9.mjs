@@ -106,14 +106,14 @@ function assertRunHistory() {
 function assertReleaseMetadata() {
   const manifest = JSON.parse(files.manifest);
   check('manifest product name is player-facing', manifest.name === 'ECHO RIFT: OVERTURE', manifest.name);
-  check('service worker cache updated', /const CACHE_NAME = 'echo-rift-prism-v7\.0\.(?:0|1-assets|2-field|3-focus)';/.test(files.sw));
+  check('service worker cache updated', /const CACHE_NAME = '(?:echo-rift-prism-v7\.0\.(?:0|1-assets|2-field|3-focus)|echo-rift-first-contact-v7\.1\.0)';/.test(files.sw));
   check('title updated', includes(files.html, 'ECHO RIFT: OVERTURE'));
-  check('edition badge updated', /v7\.0(?:\.\d+)? · PRISM/.test(files.html));
-  check('VERSION updated', /Version 7\.0\.\d+/.test(files.version) && includes(files.version, 'Codename: PRISM'));
-  check('README updated', includes(files.readme, '7.0') && includes(files.readme, 'PRISM'));
-  check('CHANGELOG has 7.0 first section', match(files.changelog, /^# .+\r?\n\r?\n## 7\.0\.\d+ — OVERTURE \/ PRISM/m));
-  check('TECHNICAL_NOTES updated', includes(files.technical, '7.0') && includes(files.technical, 'verify-7.0-render'));
-  check('QA_REPORT updated', includes(files.qa, '7.0') && includes(files.qa, 'PRISM'));
+  check('edition badge updated', /v7\.0(?:\.\d+)? · PRISM|v7\.1\.0 · FIRST CONTACT/.test(files.html));
+  check('VERSION updated', (/Version 7\.0\.\d+/.test(files.version) && includes(files.version, 'Codename: PRISM')) || (includes(files.version, 'Version 7.1.0') && includes(files.version, 'Codename: FIRST CONTACT')));
+  check('README updated', (includes(files.readme, '7.0') && includes(files.readme, 'PRISM')) || (includes(files.readme, '7.1.0') && includes(files.readme, 'FIRST CONTACT')));
+  check('CHANGELOG has current first section', match(files.changelog, /^# .+\r?\n\r?\n## (?:7\.0\.\d+ — OVERTURE \/ PRISM|7\.1\.0 — OVERTURE \/ FIRST CONTACT)/m));
+  check('TECHNICAL_NOTES updated', (includes(files.technical, '7.0') && includes(files.technical, 'verify-7.0-render')) || (includes(files.technical, '7.1') && includes(files.technical, 'verify-7.1-first-contact')));
+  check('QA_REPORT updated', (includes(files.qa, '7.0') && includes(files.qa, 'PRISM')) || (includes(files.qa, '7.1') && includes(files.qa, 'FIRST CONTACT')));
 }
 
 assertNoDuplicateHtmlIds();

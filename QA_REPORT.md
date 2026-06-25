@@ -1,10 +1,10 @@
-# ECHO RIFT: OVERTURE 7.0 — QA 보고서 (PRISM)
+# ECHO RIFT: OVERTURE 7.1 — QA 보고서 (FIRST CONTACT)
 
-검증일: 2026-06-24
+검증일: 2026-06-25
 
 ## 환경 한계
 
-이번 패치는 정적 파일 기반 브라우저 게임의 전투 렌더링 성능과 첫 런 코치 안정성을 보강했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-7.0-render.mjs`의 렌더 계약/벤치 검사, `scripts/verify-first-run-coach.mjs`의 코치 행동 검사, `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`의 기존 회귀 검사를 수행합니다. 실제 모바일 터치 실기기, 물리 게임패드, 오디오 청감, 저사양 장시간 성능, 고주사율 모니터 체감 검사는 별도 수동 확인이 필요합니다.
+이번 패치는 정적 파일 기반 브라우저 게임의 첫 60초 온보딩 흐름을 보강했습니다. 자동 검증은 Node 기반 구문 검사, `scripts/verify-7.1-first-contact.mjs`의 신선 저장 첫 접촉 행동 검사, `scripts/verify-7.0-render.mjs`의 렌더 계약/벤치 검사, `scripts/verify-first-run-coach.mjs`의 기존 코치 행동 검사, `scripts/verify-6.9.mjs`, `scripts/verify-6.10-hardening.mjs`, `scripts/verify-6.11-control.mjs`의 기존 회귀 검사를 수행합니다. 실제 모바일 터치 실기기, 물리 게임패드, 오디오 청감, 저사양 장시간 성능, 고주사율 모니터 체감 검사는 별도 수동 확인이 필요합니다.
 
 ## 실행한 자동 검사
 
@@ -13,12 +13,26 @@
 | `node --check js/game.js` | 브라우저 런타임 스크립트 구문 검사 |
 | `node --check js/control-bindings.js` | 키보드 바인딩 헬퍼 구문 검사 |
 | `node --check sw.js` | 서비스워커 구문 검사 |
+| `node --check scripts/verify-7.1-first-contact.mjs` | 7.1 첫 접촉 verifier 구문 검사 |
+| `node scripts/verify-7.1-first-contact.mjs` | 신선 저장 첫 접촉, 페이싱 게이트, 보상 중복 방지, cleanup, 입력 중립화 행동 검사 |
 | `node scripts/verify-7.0-render.mjs` | PRISM 글로우/프레임타임 품질/렌더 벤치 검사 |
+| `node scripts/verify-first-run-coach.mjs` | 기존 필드 코치 표시, 단계 전환, 숨김/타임아웃, 레이아웃 회귀 검사 |
 | `node scripts/verify-6.9.mjs` | 6.9 기능 연결, HTML ID 중복, manifest 파싱, 현재 릴리스 문자열 검사 |
 | `node scripts/verify-6.10-hardening.mjs` | 부분 리롤, import/undo, import 거부, 보스 인트로, 경로 예고 일치의 실제 브라우저 행동 검사 |
 | `node scripts/verify-6.11-control.mjs` | 설정 리매핑, 강화 카드 구조, 리롤 경제 계측, 90초 전투 루프 행동 검사 |
 | Playwright 브라우저 스모크 | 1366×768 로드, 설정 화면 진입, 데이터 UI ID, QA 훅, 콘솔/페이지 오류 확인 |
-| Git for Windows `sha256sum.exe -c CHECKSUMS.sha256` | 배포 파일 체크섬 검증 |
+| Node SHA-256 검증 스크립트 | 배포 파일 체크섬 검증 |
+
+## `verify-7.1-first-contact` 검사 범위
+
+- 신선 저장에서 기본 훈련 종료 뒤 첫 접촉 코치와 페이싱 게이트가 켜지는지 확인
+- 게이트 중 정상 웨이브 `threat`, `waveElapsed`, `spawnRemaining`이 진행되지 않는지 확인
+- 워밍업 표적 처치가 첫 처치로 기록되지만 혼자서는 강화 화면을 열지 않는지 확인
+- 전용 균열 표적에서 위상 균열이 열릴 때 첫 보상이 정확히 한 번 예약되고 강화 화면이 열리는지 확인
+- 반복 hit/QA 호출이 `rewardClaims`와 강화 선택지를 중복 증가시키지 않는지 확인
+- 강화 선택 뒤 게이트가 해제되고 정상 웨이브가 다시 스폰되는지 확인
+- timeout, dismiss, death 경로에서 임시 표적이 남지 않고 보상이 지급되지 않는지 확인
+- 튜토리얼 단계 전환 중 키보드, 포인터, 터치, 합성 게임패드 입력이 중립화되는지 확인
 
 ## `verify-7.0-render` 검사 범위
 
@@ -70,12 +84,12 @@
 - export/import 함수 내부의 `fetch`/`sendBeacon`/`eval`/`new Function` 미사용
 - 데이터 설정 UI ID 연결
 - 런 기록 상수, 로드/검증/추가/렌더링 헬퍼, 20개 상한, 중복 기록 방지 플래그
-- HTML ID 중복 없음, manifest JSON 파싱, 현재 PRISM 릴리스 문자열
+- HTML ID 중복 없음, manifest JSON 파싱, 현재 FIRST CONTACT 릴리스 문자열
 
 ## 브라우저 스모크 확인 범위
 
 - `index.html?qa=1` 로드 성공
-- 문서 제목과 edition badge가 PRISM 릴리스로 표시
+- 문서 제목과 edition badge가 FIRST CONTACT 릴리스로 표시
 - 설정 화면 진입 성공
 - `includeSettingsExport`, `exportSaveBtn`, `importSaveInput`, `runHistoryList`, `clearRunHistoryBtn`, `keybindGrid`, `resetKeyBindingsBtn` 존재
 - `window.__echoRiftQA` 활성화
@@ -92,6 +106,8 @@
 | 부분 리롤 경제 | 계측만 추가, 카드 생성·리롤 비용 미변경 |
 | 경로 예측 = 실제 웨이브 | 미변경 |
 | 기본·고급 튜토리얼 분리 | 미변경 |
+| 튜토리얼 단계 전환 입력 carryover | 0.15초 중립 게이트 추가 |
+| 첫 일반 런 웨이브 압력 | 첫 강화 선택 전까지만 일시 정지 |
 | 보스 인트로 피해/시뮬레이션 정지 | 미변경 |
 | 자동 품질 런 중 재상향 금지 | 미변경 |
 | 6.8 SIGNAL 투사체 형상·팔레트 | 미변경 |

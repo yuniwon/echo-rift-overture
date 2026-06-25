@@ -91,12 +91,12 @@ async function waitForGame(page, baseUrl) {
 
 function assertReleaseMetadata() {
   const manifest = JSON.parse(files.manifest);
-  check('GAME_VERSION is PRISM 7.0.x', /const GAME_VERSION = '7\.0\.\d+';/.test(files.game));
-  check('service worker cache is PRISM 7.0.x', /const CACHE_NAME = 'echo-rift-prism-v7\.0\.(?:0|1-assets|2-field|3-focus)';/.test(files.sw));
+  check('GAME_VERSION is supported 7.x release', /const GAME_VERSION = '7\.(?:0\.\d+|1\.0)';/.test(files.game));
+  check('service worker cache is supported 7.x release', /const CACHE_NAME = '(?:echo-rift-prism-v7\.0\.(?:0|1-assets|2-field|3-focus)|echo-rift-first-contact-v7\.1\.0)';/.test(files.sw));
   check('manifest remains player-facing', manifest.name === 'ECHO RIFT: OVERTURE' && /3초/.test(manifest.description), manifest.description);
-  check('VERSION marks PRISM', /Version 7\.0\.\d+/.test(files.version) && files.version.includes('Codename: PRISM'));
-  check('README marks PRISM', files.readme.includes('7.0') && files.readme.includes('PRISM'));
-  check('CHANGELOG has 7.0 section first', /^# .+\r?\n\r?\n## 7\.0\.\d+ — OVERTURE \/ PRISM/m.test(files.changelog));
+  check('VERSION marks supported 7.x release', (/Version 7\.0\.\d+/.test(files.version) && files.version.includes('Codename: PRISM')) || (files.version.includes('Version 7.1.0') && files.version.includes('Codename: FIRST CONTACT')));
+  check('README marks PRISM lineage', files.readme.includes('7.0') && files.readme.includes('PRISM') && files.readme.includes('FIRST CONTACT'));
+  check('CHANGELOG has current 7.x section first', /^# .+\r?\n\r?\n## (?:7\.0\.\d+ — OVERTURE \/ PRISM|7\.1\.0 — OVERTURE \/ FIRST CONTACT)/m.test(files.changelog));
   check('TECHNICAL_NOTES marks render verifier', files.technical.includes('verify-7.0-render'));
   check('QA_REPORT marks PRISM', files.qa.includes('7.0') && files.qa.includes('PRISM'));
   check('QUALITY_REPORT contains PRISM before/after metrics', files.quality.includes('PRISM') && files.quality.includes('Before / After') && files.quality.includes('renderBenchmark'));

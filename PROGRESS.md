@@ -198,3 +198,49 @@ The next bottleneck is not rules or content; it is Canvas 2D glow cost during de
 | Bullet/particle glow | Canvas `ctx.shadowBlur` in hot draw paths | Cached glow sprite `drawImage` path |
 | Auto quality downgrade | Object pressure or frame/FPS trip | Frame-time/FPS trip; object pressure as diagnostics |
 | QA render proof | No deterministic render benchmark hook | `__echoRiftQA.renderBenchmark()` reports frame time, glow passes, shadow blur uses |
+
+## Iteration 4 — FIRST CONTACT Onboarding Proof
+
+Date: 2026-06-25
+
+Build: `ECHO RIFT: OVERTURE 7.1 — FIRST CONTACT`
+
+Decision: keep scope narrow. Runtime changes are limited to the first normal run's first-minute pacing gate, first-contact reward chain, tutorial input neutralization, and QA proof. No combat balance, new content, storage schema, rendering path, external dependency, or online telemetry change is included.
+
+### Hypothesis
+
+The next bottleneck is not another feature. A fresh player should experience the core verb as a cause-and-effect chain: kill safely, record a usable 3 seconds, deploy the echo, open a phase rift with the past self, and receive the first upgrade because of that cooperation.
+
+### Files Changed
+
+- `AGENTS.md`
+- `js/game.js`
+- `sw.js`
+- `index.html`
+- `VERSION.txt`
+- `scripts/verify-7.1-first-contact.mjs`
+- `scripts/verify-6.11-control.mjs`
+- `scripts/verify-6.9.mjs`
+- release docs and `CHECKSUMS.sha256`
+
+### Checks
+
+| Check | Result | Evidence |
+|---|---|---|
+| `node scripts/verify-7.1-first-contact.mjs` before implementation | FAIL EXPECTED | missing onboarding status, first-contact hooks, metadata, and wave pressure pause |
+| `node --check js/game.js` | PASS | exit code 0, no output |
+| `node --check js/control-bindings.js` | PASS | exit code 0, no output |
+| `node --check sw.js` | PASS | exit code 0, no output |
+| `node --check scripts/verify-7.1-first-contact.mjs` | PASS | exit code 0, no output |
+| `node scripts/verify-7.1-first-contact.mjs` | PASS | `verify-7.1-first-contact passed` |
+| Prior regression suite | PASS | `verify-first-run-coach`, `verify-6.11-control`, `verify-6.10-hardening`, `verify-route-layout`, `verify-ui-readability`, `verify-7.0-render`, `verify-asset-pack`, `verify-6.9` passed |
+| `CHECKSUMS.sha256` verify | PASS | `checksum verify OK (59 files)` |
+
+### Before / After
+
+| Area | Before | After |
+|---|---|---|
+| First-run pressure | Normal wave could spawn while the field coach was still teaching the core verb | First-contact gate pauses normal wave elapsed/threat/spawns until the first upgrade is chosen |
+| First phase-rift payoff | Coach completion and first upgrade were loosely related | Dedicated first-contact target grants exactly one first upgrade from the first phase rift |
+| Tutorial step transition | Held input could leak into the next step | Keyboard, pointer, touch, and gamepad must be neutral for 0.15s before progress/input resumes |
+| QA proof | First-run coach and PRISM were tested separately | `verify-7.1-first-contact` tests the full fresh-save first-contact chain and cleanup paths |

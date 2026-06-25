@@ -184,7 +184,7 @@ async function runBrowserChecks() {
 
     const combatProbe = await page.evaluate(() => {
       const qa = window.__echoRiftQA;
-      qa.start();
+      qa.startTraining();
       qa.skipTraining();
       qa.applyUpgrade('attackSpeed', 'rare');
       qa.applyUpgrade('echoDamage', 'rare');
