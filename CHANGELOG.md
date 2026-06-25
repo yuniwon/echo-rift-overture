@@ -1,5 +1,14 @@
 # 변경 내역
 
+## 7.1.1 — OVERTURE / FIRST CONTACT HARDENING
+
+### GPT 검수 보강
+
+- 중립 게이트가 이미 활성화된 뒤 새로 들어온 pointer/touch down을 `blockedPointers`로 추적해 실제 release 전에는 다음 튜토리얼 단계 입력으로 인정하지 않음
+- 첫 접촉 보상 검증에 `player.xpGain > 1`과 기존 `pendingLevelUps > 0` 예외 상태 추가
+- `scripts/verify-7.1-first-contact.mjs`가 fresh-start 재검증마다 페이지를 reload해 메모리상의 `fieldCoachSeen` 잔류를 제거하도록 수정
+- 서비스워커 cache name을 `echo-rift-first-contact-v7.1.1`로 갱신
+
 ## 7.1.0 — OVERTURE / FIRST CONTACT
 
 ### 첫 60초 핵심 체인
